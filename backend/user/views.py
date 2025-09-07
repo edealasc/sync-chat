@@ -8,6 +8,8 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import RefreshToken
 import json
 from django.shortcuts import render
+from .models import Bot
+from .tasks import crawl_and_embed
 
 User = get_user_model()
 
@@ -83,19 +85,57 @@ def token_refresh(request):
 def onboarding(request):
     try:
         user = request.user
-        if not user or user.is_anonymous:
-            return JsonResponse({"error": "Authentication required."}, status=401)
         data = request.data
-        user.website_url = data.get("websiteUrl", "")
-        user.business_name = data.get("businessName", "")
-        user.business_type = data.get("businessType", "")
-        user.chatbot_name = data.get("chatbotName", "")
-        user.tone = data.get("tone", "")
-        user.support_goals = data.get("supportGoals", "")
-        user.languages = data.get("languages", ["English"])
-        user.save()
-        return JsonResponse({"success": True})
+        bot = Bot.objects.create(
+            user=user,
+            website_url=data.get("websiteUrl", ""),
+            business_name=data.get("businessName", ""),
+            business_type=data.get("businessType", ""),
+            chatbot_name=data.get("chatbotName", ""),
+            tone=data.get("tone", ""),
+            support_goals=data.get("supportGoals", ""),
+            languages=data.get("languages", ["English"]),
+            status="crawling",  # Set initial status
+        )
+        # Trigger async crawling and embedding
+        crawl_and_embed.delay(bot.id, bot.website_url)
+        return JsonResponse({"success": True, "bot_id": bot.id})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)
+
+@api_view(["GET"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def dashboard(request):
+    user = request.user
+    bots = Bot.objects.filter(user=user)
+    bots_data = []
+    for bot in bots:
+        conversations = bot.conversations.order_by('-created_at')[:5]
+        conversations_data = [
+            {
+                "id": convo.id,
+                "customer_name": convo.customer_name,
+                "message": convo.message,
+                "created_at": convo.created_at.strftime("%Y-%m-%d %H:%M"),
+                "resolved": convo.resolved,
+                "bot": bot.chatbot_name,
+            }
+            for convo in conversations
+        ]
+        bots_data.append({
+            "id": bot.id,
+            "chatbot_name": bot.chatbot_name,
+            "website_url": bot.website_url,
+            "business_name": bot.business_name,
+            "business_type": bot.business_type,
+            "tone": bot.tone,
+            "support_goals": bot.support_goals,
+            "languages": bot.languages,
+            "status": bot.status,
+            "conversation_count": bot.conversations.count(),
+            "recent_conversations": conversations_data,  # <-- Add this
+        })
+    return JsonResponse({"bots": bots_data})
 
 # Create your views here.

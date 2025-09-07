@@ -5,6 +5,15 @@ class CustomUser(AbstractUser):
     email = models.EmailField(unique=True)
     first_name = models.CharField(max_length=150, blank=True)
     last_name = models.CharField(max_length=150, blank=True)
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['username']
+
+    def __str__(self):
+        return self.email
+
+class Bot(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="bots")
     website_url = models.URLField(blank=True)
     business_name = models.CharField(max_length=255, blank=True)
     business_type = models.CharField(max_length=50, blank=True)
@@ -12,9 +21,17 @@ class CustomUser(AbstractUser):
     tone = models.CharField(max_length=50, blank=True)
     support_goals = models.TextField(blank=True)
     languages = models.JSONField(default=list, blank=True)
-
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username']
+    status = models.CharField(max_length=20, default="active")  # e.g. active, crawling, paused
 
     def __str__(self):
-        return self.email
+        return f"{self.chatbot_name} ({self.website_url})"
+
+class Conversation(models.Model):
+    bot = models.ForeignKey('Bot', on_delete=models.CASCADE, related_name='conversations')
+    customer_name = models.CharField(max_length=255, blank=True)
+    message = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Conversation with {self.customer_name} ({self.bot.chatbot_name})"

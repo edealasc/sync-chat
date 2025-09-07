@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { apiRequest } from "@/lib/api"
 import {
   Bot,
   Globe,
@@ -21,75 +22,27 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 export default function Dashboard() {
-  const [selectedChatbot, setSelectedChatbot] = useState("main-website")
+  const [bots, setBots] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [selectedChatbot, setSelectedChatbot] = useState(null)
+  const [recentConversations, setRecentConversations] = useState([])
 
-  const chatbots = [
-    {
-      id: "main-website",
-      name: "Main Website Bot",
-      website: "mycompany.com",
-      status: "active",
-      conversations: 1247,
-      satisfaction: 94,
-      responseTime: "1.2s",
-      lastCrawl: "2 hours ago",
-    },
-    {
-      id: "support-portal",
-      name: "Support Portal Bot",
-      website: "support.mycompany.com",
-      status: "active",
-      conversations: 856,
-      satisfaction: 91,
-      responseTime: "0.8s",
-      lastCrawl: "4 hours ago",
-    },
-    {
-      id: "docs-site",
-      name: "Documentation Bot",
-      website: "docs.mycompany.com",
-      status: "crawling",
-      conversations: 423,
-      satisfaction: 96,
-      responseTime: "1.5s",
-      lastCrawl: "In progress",
-    },
-  ]
+  useEffect(() => {
+    async function fetchBots() {
+      const res = await apiRequest("api/user/dashboard/", "GET", undefined, { auth: true })
+      if (res.bots) {
+        setBots(res.bots)
+        if (res.bots.length > 0) setSelectedChatbot(res.bots[0].id)
+        // Gather all recent conversations from all bots
+        const allConvos = res.bots.flatMap(bot => bot.recent_conversations || [])
+        setRecentConversations(allConvos)
+      }
+      setLoading(false)
+    }
+    fetchBots()
+  }, [])
 
-  const recentConversations = [
-    {
-      id: 1,
-      customer: "Sarah Johnson",
-      message: "How do I reset my password?",
-      bot: "Main Website Bot",
-      time: "2 minutes ago",
-      resolved: true,
-    },
-    {
-      id: 2,
-      customer: "Mike Chen",
-      message: "What are your pricing plans?",
-      bot: "Main Website Bot",
-      time: "5 minutes ago",
-      resolved: true,
-    },
-    {
-      id: 3,
-      customer: "Emma Davis",
-      message: "Integration with Slack not working",
-      bot: "Support Portal Bot",
-      time: "12 minutes ago",
-      resolved: false,
-    },
-    {
-      id: 4,
-      customer: "Alex Rodriguez",
-      message: "API documentation unclear",
-      bot: "Documentation Bot",
-      time: "18 minutes ago",
-      resolved: true,
-    },
-  ]
+  if (loading) return <div>Loading...</div>
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white">
@@ -197,7 +150,7 @@ export default function Dashboard() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-              {chatbots.map((bot) => (
+              {bots.map((bot) => (
                 <Card
                   key={bot.id}
                   className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
@@ -205,62 +158,29 @@ export default function Dashboard() {
                 >
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg font-semibold text-gray-900">{bot.name}</CardTitle>
-                      <Badge
-                        variant={
-                          bot.status === "active" ? "default" : bot.status === "crawling" ? "secondary" : "destructive"
-                        }
-                      >
-                        {bot.status === "active" && <CheckCircle className="w-3 h-3 mr-1" />}
-                        {bot.status === "crawling" && <Zap className="w-3 h-3 mr-1" />}
-                        {bot.status === "paused" && <Pause className="w-3 h-3 mr-1" />}
+                      <CardTitle className="text-lg font-semibold text-gray-900">{bot.chatbot_name}</CardTitle>
+                      <Badge variant={bot.status === "active" ? "default" : bot.status === "crawling" ? "secondary" : "destructive"}>
                         {bot.status}
                       </Badge>
                     </div>
                     <CardDescription className="flex items-center">
-                      <Globe className="w-4 h-4 mr-2 text-gray-400" />
-                      {bot.website}
+                      {bot.website_url}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
+                        <p className="text-gray-500">Business Name</p>
+                        <p className="font-semibold text-gray-900">{bot.business_name}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Business Type</p>
+                        <p className="font-semibold text-gray-900">{bot.business_type}</p>
+                      </div>
+                      <div>
                         <p className="text-gray-500">Conversations</p>
-                        <p className="font-semibold text-gray-900">{bot.conversations.toLocaleString()}</p>
+                        <p className="font-semibold text-gray-900">{bot.conversation_count}</p>
                       </div>
-                      <div>
-                        <p className="text-gray-500">Satisfaction</p>
-                        <p className="font-semibold text-gray-900">{bot.satisfaction}%</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500">Response Time</p>
-                        <p className="font-semibold text-gray-900">{bot.responseTime}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500">Last Crawl</p>
-                        <p className="font-semibold text-gray-900">{bot.lastCrawl}</p>
-                      </div>
-                    </div>
-
-                    {bot.status === "crawling" && (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-500">Crawling Progress</span>
-                          <span className="text-gray-900">73%</span>
-                        </div>
-                        <Progress value={73} className="h-2" />
-                      </div>
-                    )}
-
-                    <div className="flex space-x-2">
-                      <Button variant="outline" size="sm" className="flex-1 bg-transparent">
-                        <Settings className="w-4 h-4 mr-2" />
-                        Configure
-                      </Button>
-                      <Button variant="outline" size="sm" className="flex-1 bg-transparent">
-                        <BarChart3 className="w-4 h-4 mr-2" />
-                        Analytics
-                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -287,20 +207,20 @@ export default function Dashboard() {
                           <div className="flex items-center space-x-3 mb-2">
                             <Avatar className="w-8 h-8">
                               <AvatarFallback className="text-xs">
-                                {conversation.customer
+                                {conversation.customer_name
                                   .split(" ")
                                   .map((n) => n[0])
                                   .join("")}
                               </AvatarFallback>
                             </Avatar>
                             <div>
-                              <p className="font-medium text-gray-900">{conversation.customer}</p>
+                              <p className="font-medium text-gray-900">{conversation.customer_name}</p>
                               <p className="text-sm text-gray-500">{conversation.bot}</p>
                             </div>
                           </div>
                           <p className="text-gray-700 mb-2">{conversation.message}</p>
                           <div className="flex items-center space-x-4 text-sm text-gray-500">
-                            <span>{conversation.time}</span>
+                            <span>{conversation.created_at}</span>
                             <Badge variant={conversation.resolved ? "default" : "secondary"}>
                               {conversation.resolved ? "Resolved" : "Pending"}
                             </Badge>
@@ -396,20 +316,20 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {chatbots.map((bot) => (
+                    {bots.map((bot) => (
                       <div key={bot.id} className="flex items-center justify-between">
                         <div>
-                          <p className="font-medium text-gray-900">{bot.name}</p>
-                          <p className="text-sm text-gray-500">{bot.website}</p>
+                          <p className="font-medium text-gray-900">{bot.chatbot_name}</p>
+                          <p className="text-sm text-gray-500">{bot.website_url}</p>
                         </div>
                         <div className="flex items-center space-x-2">
                           <div className="w-20 bg-gray-200 rounded-full h-2">
                             <div
                               className="bg-gradient-to-r from-[#7db3d3] to-[#5a9bc4] h-2 rounded-full"
-                              style={{ width: `${bot.satisfaction}%` }}
+                              style={{ width: `${bot.satisfaction ? bot.satisfaction : 94}%` }} // fallback to 94% if not present
                             ></div>
                           </div>
-                          <span className="text-sm font-medium text-gray-900 w-8">{bot.satisfaction}%</span>
+                          <span className="text-sm font-medium text-gray-900 w-8">{bot.satisfaction ? bot.satisfaction : 94}%</span>
                         </div>
                       </div>
                     ))}

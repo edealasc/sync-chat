@@ -1,6 +1,6 @@
- "use client"
+"use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -26,6 +26,9 @@ export default function OnboardingPage() {
     tone: "",
     languages: ["English"],
   })
+  const [botId, setBotId] = useState<number | null>(null)
+  const [botStatus, setBotStatus] = useState<string | null>(null)
+  const pollingRef = useRef<NodeJS.Timeout | null>(null)
 
   const router = useRouter()
 
@@ -39,6 +42,33 @@ export default function OnboardingPage() {
     }
   }
 
+  // Polling function
+  useEffect(() => {
+    if (isProcessing && botId) {
+      pollingRef.current = setInterval(async () => {
+        try {
+          const res = await apiRequest("api/user/dashboard/", "GET", undefined, { auth: true })
+          if (res.bots) {
+            const bot = res.bots.find((b: any) => b.id === botId)
+            if (bot) {
+              setBotStatus(bot.status)
+              if (bot.status === "active") {
+                clearInterval(pollingRef.current!)
+                router.push("/dashboard")
+              }
+            }
+          }
+        } catch (err) {
+          // Optionally handle error
+        }
+      }, 3000) // Poll every 3 seconds
+
+      return () => {
+        if (pollingRef.current) clearInterval(pollingRef.current)
+      }
+    }
+  }, [isProcessing, botId, router])
+
   const handleSubmit = async () => {
     setIsProcessing(true)
     try {
@@ -48,18 +78,17 @@ export default function OnboardingPage() {
         formData,
         { auth: true }
       )
-      // Redirect to dashboard if successful
-      if (res.success) {
-        router.push("/dashboard")
+      if (res.success && res.bot_id) {
+        setBotId(res.bot_id)
+        setBotStatus("crawling")
+        // Polling will start via useEffect
       } else if (res.error) {
         // Show error message
-        // e.g. setError(res.error)
       }
     } catch (err) {
       // Show error message
-      // e.g. setError("Failed to submit onboarding")
     }
-    setIsProcessing(false)
+    // Don't set isProcessing to false here, let polling handle redirect
   }
 
   const updateFormData = (field: string, value: string) => {
@@ -91,14 +120,21 @@ export default function OnboardingPage() {
               <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-200">
                 <div className="flex items-center space-x-3">
                   <CheckCircle className="w-5 h-5 text-green-600" />
-                  <span className="text-green-800 font-medium">Website crawling completed</span>
+                  <span className="text-green-800 font-medium">
+                    {botStatus === "active"
+                      ? "Website crawling completed"
+                      : "Website crawling in progress"}
+                  </span>
                 </div>
               </div>
-
               <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="flex items-center space-x-3">
-                  <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-                  <span className="text-blue-800 font-medium">Training AI model with your content</span>
+                  <Loader2 className={`w-5 h-5 text-blue-600 ${botStatus !== "active" ? "animate-spin" : ""}`} />
+                  <span className="text-blue-800 font-medium">
+                    {botStatus === "active"
+                      ? "AI model training completed"
+                      : "Training AI model with your content"}
+                  </span>
                 </div>
               </div>
 
