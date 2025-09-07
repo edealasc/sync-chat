@@ -1,4 +1,4 @@
-"use client"
+ "use client"
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -11,6 +11,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { CheckCircle, Bot, Zap, ArrowRight, Loader2 } from "lucide-react"
 import Link from "next/link"
+import { apiRequest } from "@/lib/api"
+import { useRouter } from "next/navigation"
 
 export default function OnboardingPage() {
   const [currentStep, setCurrentStep] = useState(1)
@@ -25,6 +27,8 @@ export default function OnboardingPage() {
     languages: ["English"],
   })
 
+  const router = useRouter()
+
   const totalSteps = 3
 
   const handleNext = () => {
@@ -37,8 +41,24 @@ export default function OnboardingPage() {
 
   const handleSubmit = async () => {
     setIsProcessing(true)
-    // Simulate processing time
-    await new Promise((resolve) => setTimeout(resolve, 5000))
+    try {
+      const res = await apiRequest(
+        "api/user/onboarding/",
+        "POST",
+        formData,
+        { auth: true }
+      )
+      // Redirect to dashboard if successful
+      if (res.success) {
+        router.push("/dashboard")
+      } else if (res.error) {
+        // Show error message
+        // e.g. setError(res.error)
+      }
+    } catch (err) {
+      // Show error message
+      // e.g. setError("Failed to submit onboarding")
+    }
     setIsProcessing(false)
   }
 

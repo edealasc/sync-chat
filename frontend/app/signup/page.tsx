@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Eye, EyeOff, Bot } from "lucide-react"
-import { register } from "@/lib/api" // <-- import register
+import { register, login } from "@/lib/api" // <-- import register and login
 import { useRouter } from "next/navigation"
 
 export default function SignUpPage() {
@@ -36,7 +36,13 @@ export default function SignUpPage() {
       if (res.error) {
         setError(res.error)
       } else {
-        router.push("/onboarding") // Redirect to onboarding on success
+        // Always use login to obtain and set tokens
+        const loginRes = await login(email, password)
+        if (loginRes.access && loginRes.refresh) {
+          router.push("/onboarding")
+        } else {
+          setError("Registration succeeded but login failed.")
+        }
       }
     } catch (err: any) {
       setError("Failed to register")
