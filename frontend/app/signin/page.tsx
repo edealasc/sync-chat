@@ -7,9 +7,35 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Eye, EyeOff, Bot } from "lucide-react"
+import { login } from "@/lib/api" // <-- import login
+import { useRouter } from "next/navigation"
 
 export default function SignInPage() {
   const [showPassword, setShowPassword] = useState(false)
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+    try {
+      const res = await login(email, password)
+      if (res.error) {
+        setError(res.error)
+      } else if (res.access && res.refresh) {
+        router.push("/") // Redirect to home or dashboard
+      } else {
+        setError("Invalid response from server")
+      }
+    } catch (err: any) {
+      setError("Failed to sign in")
+    }
+    setLoading(false)
+  }
 
   return (
     <div
@@ -40,7 +66,7 @@ export default function SignInPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <form className="space-y-4">
+          <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="space-y-2">
               <Label htmlFor="email" className="text-sm font-medium text-gray-700">
                 Email address*
@@ -49,6 +75,8 @@ export default function SignInPage() {
                 id="email"
                 type="email"
                 placeholder="Enter your email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
                 className="h-12 border-gray-200 focus:border-[#a8c69f] focus:ring-[#a8c69f]/20 transition-all duration-200"
                 required
               />
@@ -63,6 +91,8 @@ export default function SignInPage() {
                   id="password"
                   type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
                   className="h-12 pr-12 border-gray-200 focus:border-[#a8c69f] focus:ring-[#a8c69f]/20 transition-all duration-200"
                   required
                 />
@@ -75,7 +105,7 @@ export default function SignInPage() {
                 </button>
               </div>
             </div>
-
+            {error && <div className="text-red-500 text-sm">{error}</div>}
             <div className="flex items-center justify-between text-sm">
               <label className="flex items-center gap-2 text-gray-600">
                 <input type="checkbox" className="rounded border-gray-300 text-[#a8c69f] focus:ring-[#a8c69f]/20" />
@@ -89,8 +119,9 @@ export default function SignInPage() {
             <Button
               type="submit"
               className="w-full h-12 bg-gray-900 hover:bg-gray-800 text-white font-medium transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] border-0"
+              disabled={loading}
             >
-              Continue
+              {loading ? "Signing in..." : "Continue"}
             </Button>
           </form>
 

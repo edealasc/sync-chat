@@ -7,10 +7,42 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Eye, EyeOff, Bot } from "lucide-react"
+import { register } from "@/lib/api" // <-- import register
+import { useRouter } from "next/navigation"
 
 export default function SignUpPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    if (password !== confirmPassword) {
+      setError("Passwords do not match")
+      return
+    }
+    setLoading(true)
+    try {
+      const [first_name, ...lastArr] = name.split(" ")
+      const last_name = lastArr.join(" ")
+      const res = await register({ email, password, first_name, last_name })
+      if (res.error) {
+        setError(res.error)
+      } else {
+        router.push("/onboarding") // Redirect to onboarding on success
+      }
+    } catch (err: any) {
+      setError("Failed to register")
+    }
+    setLoading(false)
+  }
 
   return (
     <div
@@ -41,7 +73,7 @@ export default function SignUpPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <form className="space-y-4">
+          <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="space-y-2">
               <Label htmlFor="name" className="text-sm font-medium text-gray-700">
                 Full name*
@@ -50,6 +82,8 @@ export default function SignUpPage() {
                 id="name"
                 type="text"
                 placeholder="Enter your full name"
+                value={name}
+                onChange={e => setName(e.target.value)}
                 className="h-12 border-gray-200 focus:border-[#a8c69f] focus:ring-[#a8c69f]/20 transition-all duration-200"
                 required
               />
@@ -63,6 +97,8 @@ export default function SignUpPage() {
                 id="email"
                 type="email"
                 placeholder="Enter your email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
                 className="h-12 border-gray-200 focus:border-[#a8c69f] focus:ring-[#a8c69f]/20 transition-all duration-200"
                 required
               />
@@ -77,6 +113,8 @@ export default function SignUpPage() {
                   id="password"
                   type={showPassword ? "text" : "password"}
                   placeholder="Create a password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
                   className="h-12 pr-12 border-gray-200 focus:border-[#a8c69f] focus:ring-[#a8c69f]/20 transition-all duration-200"
                   required
                 />
@@ -99,6 +137,8 @@ export default function SignUpPage() {
                   id="confirmPassword"
                   type={showConfirmPassword ? "text" : "password"}
                   placeholder="Confirm your password"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
                   className="h-12 pr-12 border-gray-200 focus:border-[#a8c69f] focus:ring-[#a8c69f]/20 transition-all duration-200"
                   required
                 />
@@ -112,11 +152,14 @@ export default function SignUpPage() {
               </div>
             </div>
 
+            {error && <div className="text-red-500 text-sm">{error}</div>}
+
             <Button
               type="submit"
               className="w-full h-12 bg-gray-900 hover:bg-gray-800 text-white font-medium transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] border-0"
+              disabled={loading}
             >
-              Create account
+              {loading ? "Creating..." : "Create account"}
             </Button>
           </form>
 
