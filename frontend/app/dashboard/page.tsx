@@ -20,12 +20,18 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import ReactMarkdown from "react-markdown"
 
 export default function Dashboard() {
   const [bots, setBots] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedChatbot, setSelectedChatbot] = useState(null)
   const [recentConversations, setRecentConversations] = useState([])
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalBot, setModalBot] = useState(null)
+  const [selectedConversation, setSelectedConversation] = useState(null)
+  const [conversationModalOpen, setConversationModalOpen] = useState(false)
 
   useEffect(() => {
     async function fetchBots() {
@@ -33,8 +39,15 @@ export default function Dashboard() {
       if (res.bots) {
         setBots(res.bots)
         if (res.bots.length > 0) setSelectedChatbot(res.bots[0].id)
-        // Gather all recent conversations from all bots
-        const allConvos = res.bots.flatMap(bot => bot.recent_conversations || [])
+        // Gather all recent conversations from all bots, now with messages array
+        const allConvos = res.bots.flatMap(bot =>
+          (bot.recent_conversations || []).map(convo => ({
+            ...convo,
+            bot: bot.chatbot_name,
+            bot_id: bot.id,
+            website_url: bot.website_url,
+          }))
+        )
         setRecentConversations(allConvos)
       }
       setLoading(false)
@@ -154,13 +167,18 @@ export default function Dashboard() {
                 <Card
                   key={bot.id}
                   className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
-                  onClick={() => setSelectedChatbot(bot.id)}
+                  onClick={() => {
+                    setModalBot(bot)
+                    setModalOpen(true)
+                  }}
                 >
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg font-semibold text-gray-900">{bot.chatbot_name}</CardTitle>
+                      <CardTitle className="text-lg font-semibold text-gray-900">
+                        {bot.chatbot_name ? bot.chatbot_name.charAt(0).toUpperCase() + bot.chatbot_name.slice(1) : ""}
+                      </CardTitle>
                       <Badge variant={bot.status === "active" ? "default" : bot.status === "crawling" ? "secondary" : "destructive"}>
-                        {bot.status}
+                        {bot.status ? bot.status.charAt(0).toUpperCase() + bot.status.slice(1) : ""}
                       </Badge>
                     </div>
                     <CardDescription className="flex items-center">
@@ -171,11 +189,15 @@ export default function Dashboard() {
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <p className="text-gray-500">Business Name</p>
-                        <p className="font-semibold text-gray-900">{bot.business_name}</p>
+                        <p className="font-semibold text-gray-900">
+                          {bot.business_name ? bot.business_name.charAt(0).toUpperCase() + bot.business_name.slice(1) : ""}
+                        </p>
                       </div>
                       <div>
                         <p className="text-gray-500">Business Type</p>
-                        <p className="font-semibold text-gray-900">{bot.business_type}</p>
+                        <p className="font-semibold text-gray-900">
+                          {bot.business_type ? bot.business_type.charAt(0).toUpperCase() + bot.business_type.slice(1) : ""}
+                        </p>
                       </div>
                       <div>
                         <p className="text-gray-500">Conversations</p>
@@ -201,7 +223,14 @@ export default function Dashboard() {
               <CardContent className="p-0">
                 <div className="divide-y divide-gray-100">
                   {recentConversations.map((conversation) => (
-                    <div key={conversation.id} className="p-6 hover:bg-gray-50 transition-colors">
+                    <div
+                      key={conversation.id}
+                      className="p-6 hover:bg-gray-50 transition-colors cursor-pointer"
+                      onClick={() => {
+                        setSelectedConversation(conversation)
+                        setConversationModalOpen(true)
+                      }}
+                    >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-2">
@@ -218,7 +247,12 @@ export default function Dashboard() {
                               <p className="text-sm text-gray-500">{conversation.bot}</p>
                             </div>
                           </div>
-                          <p className="text-gray-700 mb-2">{conversation.message}</p>
+                          {/* Show the FIRST message if available */}
+                          <p className="text-gray-700 mb-2">
+                            {conversation.messages && conversation.messages.length > 0
+                              ? conversation.messages[0].text
+                              : ""}
+                          </p>
                           <div className="flex items-center space-x-4 text-sm text-gray-500">
                             <span>{conversation.created_at}</span>
                             <Badge variant={conversation.resolved ? "default" : "secondary"}>
@@ -235,6 +269,76 @@ export default function Dashboard() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Conversation Modal */}
+            <Dialog open={conversationModalOpen} onOpenChange={setConversationModalOpen}>
+              <DialogContent className="max-w-lg p-0 overflow-hidden">
+                {selectedConversation && (
+                  <div className="bg-white rounded-2xl shadow-xl">
+                    {/* Header similar to bot modal */}
+                    <div className="bg-gradient-to-r from-[#a8c69f]/20 to-[#7db3d3]/20 px-8 py-6 flex flex-col items-center border-b">
+                      <MessageSquare className="w-12 h-12 text-[#7db3d3] mb-2" />
+                      <DialogHeader className="items-center">
+                        <DialogTitle className="text-2xl font-bold text-gray-900">
+                          Conversation with {selectedConversation.customer_name}
+                        </DialogTitle>
+                        <DialogDescription>
+                          <span className="text-gray-500">{selectedConversation.created_at}</span>
+                        </DialogDescription>
+                      </DialogHeader>
+                      <Badge
+                        variant={selectedConversation.resolved ? "default" : "secondary"}
+                        className="mt-3"
+                      >
+                        {selectedConversation.resolved ? "Resolved" : "Pending"}
+                      </Badge>
+                    </div>
+                    {/* Chat body */}
+                    <div className="px-8 py-6 space-y-4 max-h-96 overflow-y-auto bg-gray-50">
+                      {selectedConversation.messages && selectedConversation.messages.length > 0 ? (
+                        selectedConversation.messages.map((msg, idx) => (
+                          <div
+                            key={msg.id || idx}
+                            className={`flex ${msg.sender === "user" ? "justify-start" : "justify-end"}`}
+                          >
+                            <div className={`max-w-xs px-4 py-2 rounded-lg shadow-sm
+                              ${msg.sender === "user"
+                                ? "bg-white text-gray-900 border border-gray-200"
+                                : "bg-gradient-to-r from-[#a8c69f]/80 to-[#7db3d3]/80 text-white"
+                              }`}
+                            >
+                              <div className="flex items-center mb-1">
+                                <span className="font-semibold text-xs mr-2">
+                                  {msg.sender === "user"
+                                    ? selectedConversation.customer_name
+                                    : selectedConversation.bot}
+                                </span>
+                                <span className="text-[10px] text-gray-400">
+                                  {msg.timestamp}
+                                </span>
+                              </div>
+                              <span className="whitespace-pre-line break-words">
+                                <ReactMarkdown
+                                  components={{
+                                    a: ({node, ...props}) => <a {...props} className="underline text-blue-600" target="_blank" rel="noopener noreferrer" />,
+                                    code: ({node, ...props}) => <code {...props} className="bg-gray-100 px-1 rounded text-xs" />,
+                                    pre: ({node, ...props}) => <pre {...props} className="bg-gray-100 p-2 rounded mb-2 overflow-x-auto" />,
+                                  }}
+                                >
+                                  {msg.text}
+                                </ReactMarkdown>
+                              </span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-gray-500">No messages in this conversation.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="analytics" className="space-y-6">
@@ -340,6 +444,73 @@ export default function Dashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Bot Info Modal */}
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+        <DialogContent className="max-w-lg p-0 overflow-hidden">
+          {modalBot && (
+            <div className="bg-white rounded-2xl shadow-xl">
+              <div className="bg-gradient-to-r from-[#a8c69f]/20 to-[#7db3d3]/20 px-8 py-6 flex flex-col items-center border-b">
+                <Bot className="w-12 h-12 text-[#7db3d3] mb-2" />
+                <DialogHeader className="items-center">
+                  <DialogTitle className="text-2xl font-bold text-gray-900">
+                    {modalBot.chatbot_name ? modalBot.chatbot_name.charAt(0).toUpperCase() + modalBot.chatbot_name.slice(1) : ""}
+                  </DialogTitle>
+                  <DialogDescription>
+                    <span className="text-gray-500">{modalBot.website_url}</span>
+                  </DialogDescription>
+                </DialogHeader>
+                <Badge
+                  variant={modalBot.status === "active" ? "default" : modalBot.status === "crawling" ? "secondary" : "destructive"}
+                  className="mt-3"
+                >
+                  {modalBot.status ? modalBot.status.charAt(0).toUpperCase() + modalBot.status.slice(1) : ""}
+                </Badge>
+              </div>
+              <div className="px-8 py-6 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Business Name</div>
+                  <div className="font-semibold text-gray-900">
+                    {modalBot.business_name ? modalBot.business_name.charAt(0).toUpperCase() + modalBot.business_name.slice(1) : ""}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Business Type</div>
+                  <div className="font-semibold text-gray-900">
+                    {modalBot.business_type ? modalBot.business_type.charAt(0).toUpperCase() + modalBot.business_type.slice(1) : ""}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Tone</div>
+                  <div className="font-semibold text-gray-900">
+                    {modalBot.tone ? modalBot.tone.charAt(0).toUpperCase() + modalBot.tone.slice(1) : ""}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Support Goals</div>
+                  <div className="font-semibold text-gray-900">
+                    {modalBot.support_goals ? modalBot.support_goals.charAt(0).toUpperCase() + modalBot.support_goals.slice(1) : ""}
+                  </div>
+                </div>
+                <div className="md:col-span-2">
+                  <div className="text-xs text-gray-500 mb-1">Languages</div>
+                  <div className="flex flex-wrap gap-2">
+                    {(modalBot.languages || []).map((lang: string, idx: number) => (
+                      <Badge key={idx} variant="secondary" className="text-xs">
+                        {lang.charAt(0).toUpperCase() + lang.slice(1)}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Total Conversations</div>
+                  <div className="font-semibold text-gray-900">{modalBot.conversation_count}</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

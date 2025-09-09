@@ -129,10 +129,18 @@ def dashboard(request):
             {
                 "id": convo.id,
                 "customer_name": convo.customer_name,
-                "message": convo.message,
                 "created_at": convo.created_at.strftime("%Y-%m-%d %H:%M"),
-                "resolved": convo.resolved,
+                "resolved": getattr(convo, "resolved", False),
                 "bot": bot.chatbot_name,
+                "messages": [
+                    {
+                        "id": msg.id,
+                        "sender": msg.sender,
+                        "text": msg.text,
+                        "timestamp": msg.timestamp.strftime("%Y-%m-%d %H:%M"),
+                    }
+                    for msg in convo.messages.order_by("timestamp")
+                ],
             }
             for convo in conversations
         ]
@@ -147,7 +155,7 @@ def dashboard(request):
             "languages": bot.languages,
             "status": bot.status,
             "conversation_count": bot.conversations.count(),
-            "recent_conversations": conversations_data,  # <-- Add this
+            "recent_conversations": conversations_data,
         })
     return JsonResponse({"bots": bots_data})
 

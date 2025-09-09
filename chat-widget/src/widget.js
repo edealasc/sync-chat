@@ -3,6 +3,14 @@
   if (window.__SyncChatWidgetLoaded) return
   window.__SyncChatWidgetLoaded = true
 
+  // Inject marked.js if not present
+  if (!window.marked) {
+    const markedScript = document.createElement("script");
+    markedScript.src = "https://cdn.jsdelivr.net/npm/marked/marked.min.js";
+    markedScript.onload = () => render();
+    document.head.appendChild(markedScript);
+  }
+
   // Styles
   const style = document.createElement("style")
   style.innerHTML = `
@@ -97,11 +105,16 @@
       box-shadow: 0 1px 4px rgba(0,0,0,0.04);
       background: #fff;
       color: #222;
+      /* Markdown styles */
+      word-break: break-word;
     }
     .syncchat-msgbubble.user {
       background: linear-gradient(to right, #a8c69f, #96b88a);
       color: #fff;
     }
+    .syncchat-msgbubble a { color: #2563eb; text-decoration: underline; word-break: break-all; }
+    .syncchat-msgbubble code { background: #f3f4f6; color: #222; padding: 2px 4px; border-radius: 4px; font-size: 13px; }
+    .syncchat-msgbubble pre { background: #f3f4f6; padding: 8px; border-radius: 6px; overflow-x: auto; font-size: 13px; }
     .syncchat-typing {
       display: flex;
       align-items: center;
@@ -199,6 +212,7 @@
     { id: 1, text: "Hello! How can I help you today?", isBot: true }
   ]
   let isTyping = false
+  let conversationId = null;
 
   // Bot responses
   const botResponses = [
@@ -266,7 +280,12 @@
       }
       const bubble = document.createElement("div")
       bubble.className = "syncchat-msgbubble" + (msg.isBot ? "" : " user")
-      bubble.textContent = msg.text
+      // Markdown rendering
+      if (window.marked) {
+        bubble.innerHTML = window.marked.parse(msg.text || "");
+      } else {
+        bubble.textContent = msg.text;
+      }
       row.appendChild(bubble)
       msgArea.appendChild(row)
     })
@@ -346,8 +365,9 @@
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        message: text
-        // You can add customer_name or conversation_id if needed
+        message: text,
+        conversation_id: conversationId,
+        // You can add customer_name if needed
       })
     })
       .then(res => {
@@ -359,6 +379,10 @@
         const botText = data.bot_reply || "Sorry, no response."
         messages.push({ id: Date.now() + 1, text: botText, isBot: true })
         isTyping = false
+        // Store conversationId from backend if not already set
+        if (data.conversation_id) {
+          conversationId = data.conversation_id;
+        }
         render()
         // Scroll to bottom
         const msgArea = container.querySelector(".syncchat-messages")
