@@ -17,6 +17,9 @@ from google.generativeai import GenerativeModel, configure
 from django.conf import settings
 import os
 from dotenv import load_dotenv
+from django.db.models import Count
+from django.db.models.functions import TruncDate
+from datetime import timedelta
 
 load_dotenv()
 
@@ -123,6 +126,7 @@ def dashboard(request):
     user = request.user
     bots = Bot.objects.filter(user=user)
     bots_data = []
+    all_conversation_ids = []
     for bot in bots:
         conversations = bot.conversations.order_by('-created_at')[:5]
         conversations_data = [
@@ -138,6 +142,11 @@ def dashboard(request):
                         "sender": msg.sender,
                         "text": msg.text,
                         "timestamp": msg.timestamp.strftime("%Y-%m-%d %H:%M"),
+                        "satisfaction": (
+                            1 if msg.satisfied is True else
+                            0 if msg.satisfied is False else
+                            -1
+                        ),
                     }
                     for msg in convo.messages.order_by("timestamp")
                 ],
@@ -157,7 +166,50 @@ def dashboard(request):
             "conversation_count": bot.conversations.count(),
             "recent_conversations": conversations_data,
         })
-    return JsonResponse({"bots": bots_data})
+        all_conversation_ids += list(bot.conversations.values_list("id", flat=True))
+
+    # --- Conversation Volume (Trends) ---
+    # Group by date, count conversations per day for all user's bots
+    conversation_volume = (
+        Conversation.objects
+        .filter(bot__user=user)
+        .annotate(date=TruncDate('created_at'))
+        .values('date')
+        .annotate(count=Count('id'))
+        .order_by('date')
+    )
+    conversation_volume_data = [
+        {"date": cv["date"].strftime("%Y-%m-%d"), "count": cv["count"]}
+        for cv in conversation_volume
+    ]
+
+    # --- Response Times ---
+    # For each bot, compute average response time (in seconds)
+    response_times = {}
+    for bot in bots:
+        bot_convos = bot.conversations.all()
+        total_diff = timedelta()
+        count = 0
+        for convo in bot_convos:
+            msgs = list(convo.messages.order_by("timestamp"))
+            for i, msg in enumerate(msgs):
+                if msg.sender == "user":
+                    # Find next bot reply
+                    for j in range(i + 1, len(msgs)):
+                        if msgs[j].sender == "bot":
+                            diff = msgs[j].timestamp - msg.timestamp
+                            if diff.total_seconds() > 0:
+                                total_diff += diff
+                                count += 1
+                            break
+        avg_seconds = (total_diff.total_seconds() / count) if count > 0 else None
+        response_times[bot.id] = avg_seconds
+
+    return JsonResponse({
+        "bots": bots_data,
+        "conversation_volume": conversation_volume_data,
+        "response_times": response_times,
+    })
 
 @api_view(["POST"])
 @permission_classes([AllowAny])  # <-- Add this line
@@ -229,7 +281,7 @@ Answer as {bot.chatbot_name}:
     bot_reply = response.text
 
     # Save bot message
-    Message.objects.create(
+    bot_msg = Message.objects.create(
         conversation=conversation,
         sender="bot",
         text=bot_reply
@@ -239,6 +291,7 @@ Answer as {bot.chatbot_name}:
         "bot_reply": bot_reply,
         "conversation_id": conversation.id,
         "created_at": conversation.created_at.strftime("%Y-%m-%d %H:%M"),
+        "bot_message_id": bot_msg.id,  # <-- Add this line
     })
     # except Bot.DoesNotExist:
     #     return JsonResponse({"error": "Bot not found"}, status=404)
@@ -247,4 +300,24 @@ Answer as {bot.chatbot_name}:
     # except Exception as e:
     #     return JsonResponse({"error": str(e)}, status=500)
 
-# Create your views here.
+from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
+
+@api_view(["POST"])
+@permission_classes([AllowAny])  # <-- Add this line
+@csrf_exempt  # Allow anonymous POSTs
+def toggle_message_satisfaction(request, message_id):
+    """
+    Toggle or set the satisfaction field for a message.
+    Expects JSON: { "satisfied": true/false }
+    """
+    try:
+        msg = Message.objects.get(id=message_id)
+        satisfied = request.data.get("satisfied")
+        if satisfied not in [True, False, None]:
+            return JsonResponse({"error": "Invalid value for satisfied"}, status=400)
+        msg.satisfied = satisfied
+        msg.save()
+        return JsonResponse({"success": True, "message_id": msg.id, "satisfied": msg.satisfied})
+    except Message.DoesNotExist:
+        return JsonResponse({"error": "Message not found"}, status=404)

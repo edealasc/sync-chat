@@ -209,7 +209,7 @@
   // State
   let isOpen = false
   let messages = [
-    { id: 1, text: "Hello! How can I help you today?", isBot: true }
+    { id: 1, text: "Hello! How can I help you today?", isBot: true, satisfaction: null }
   ]
   let isTyping = false
   let conversationId = null;
@@ -225,7 +225,15 @@
   ]
 
   // Render
-  function render() {
+  function render({ preserveInput = false } = {}) {
+    // Save scroll and input value if needed
+    let prevScroll = 0;
+    let prevInput = "";
+    const msgAreaOld = container.querySelector(".syncchat-messages");
+    const inputOld = container.querySelector(".syncchat-input");
+    if (msgAreaOld) prevScroll = msgAreaOld.scrollTop;
+    if (preserveInput && inputOld) prevInput = inputOld.value;
+
     container.innerHTML = ""
     if (!isOpen) {
       // Toggle button
@@ -269,7 +277,7 @@
     // Messages
     const msgArea = document.createElement("div")
     msgArea.className = "syncchat-messages"
-    messages.forEach(msg => {
+    messages.forEach((msg, idx) => {
       const row = document.createElement("div")
       row.className = "syncchat-msgrow" + (msg.isBot ? "" : " user")
       if (msg.isBot) {
@@ -278,6 +286,12 @@
         botIcon.innerHTML = `<svg width="14" height="14" fill="white" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>`
         row.appendChild(botIcon)
       }
+      const bubbleAndRating = document.createElement("div")
+      bubbleAndRating.style.display = "flex"
+      bubbleAndRating.style.flexDirection = "column"
+      bubbleAndRating.style.alignItems = msg.isBot ? "flex-start" : "flex-end"
+
+      // Chat bubble
       const bubble = document.createElement("div")
       bubble.className = "syncchat-msgbubble" + (msg.isBot ? "" : " user")
       // Markdown rendering
@@ -286,7 +300,124 @@
       } else {
         bubble.textContent = msg.text;
       }
-      row.appendChild(bubble)
+      bubbleAndRating.appendChild(bubble)
+
+      // Satisfaction rating for bot messages (below bubble)
+      if (msg.isBot) {
+        const ratingDiv = document.createElement("div")
+        ratingDiv.style.display = "flex"
+        ratingDiv.style.alignItems = "center"
+        ratingDiv.style.gap = "6px" // Add gap between icons
+        ratingDiv.style.marginTop = "4px"
+
+        // Thumbs up
+        const upBtn = document.createElement("button")
+        upBtn.type = "button"
+        upBtn.style.background = "none"
+        upBtn.style.border = "none"
+        upBtn.style.cursor = msg.satisfaction === true ? "default" : "pointer"
+        upBtn.style.padding = "2px"
+        upBtn.disabled = msg.satisfaction === true
+        upBtn.setAttribute("aria-label", "Thumbs up")
+        upBtn.innerHTML = `
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+  stroke="${msg.satisfaction === true ? "#22c55e" : "#a3a3a3"}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M7 10v12"></path>
+  <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"></path>
+</svg>
+`
+        if (msg.satisfaction !== true) {
+          upBtn.onclick = () => {
+            // Optimistically update UI
+            upBtn.disabled = true;
+            upBtn.querySelector("svg").setAttribute("stroke", "#22c55e");
+            downBtn.disabled = false;
+            downBtn.querySelector("svg").setAttribute("stroke", "#a3a3a3");
+            messages[idx].satisfaction = true;
+
+            // Send satisfaction to backend
+            fetch(`http://127.0.0.1:8000/api/user/message/${msg.id}/toggle_satisfaction/`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ satisfied: true })
+            })
+            .then(res => res.json())
+            .then(data => {
+              // Optionally handle response or errors
+              if (!data.success) {
+                // Rollback UI if needed
+                messages[idx].satisfaction = null;
+                upBtn.disabled = false;
+                upBtn.querySelector("svg").setAttribute("stroke", "#a3a3a3");
+              }
+            })
+            .catch(() => {
+              // Rollback UI on error
+              messages[idx].satisfaction = null;
+              upBtn.disabled = false;
+              upBtn.querySelector("svg").setAttribute("stroke", "#a3a3a3");
+            });
+          }
+        }
+
+        // Thumbs down (SVG flipped vertically)
+        const downBtn = document.createElement("button")
+        downBtn.type = "button"
+        downBtn.style.background = "none"
+        downBtn.style.border = "none"
+        downBtn.style.cursor = msg.satisfaction === false ? "default" : "pointer"
+        downBtn.style.padding = "2px"
+        downBtn.disabled = msg.satisfaction === false
+        downBtn.setAttribute("aria-label", "Thumbs down")
+        downBtn.innerHTML = `
+<span style="display:inline-block; transform:scaleY(-1);">
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+    stroke="${msg.satisfaction === false ? "#ef4444" : "#a3a3a3"}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M7 10v12"></path>
+    <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"></path>
+  </svg>
+</span>
+`
+        if (msg.satisfaction !== false) {
+          downBtn.onclick = () => {
+            // Optimistically update UI
+            downBtn.disabled = true;
+            downBtn.querySelector("svg").setAttribute("stroke", "#ef4444");
+            upBtn.disabled = false;
+            upBtn.querySelector("svg").setAttribute("stroke", "#a3a3a3");
+            messages[idx].satisfaction = false;
+
+            // Send satisfaction to backend
+            fetch(`http://127.0.0.1:8000/api/user/message/${msg.id}/toggle_satisfaction/`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ satisfied: false })
+            })
+            .then(res => res.json())
+            .then(data => {
+              // Optionally handle response or errors
+              if (!data.success) {
+                // Rollback UI if needed
+                messages[idx].satisfaction = null;
+                downBtn.disabled = false;
+                downBtn.querySelector("svg").setAttribute("stroke", "#a3a3a3");
+              }
+            })
+            .catch(() => {
+              // Rollback UI on error
+              messages[idx].satisfaction = null;
+              downBtn.disabled = false;
+              downBtn.querySelector("svg").setAttribute("stroke", "#a3a3a3");
+            });
+          }
+        }
+
+        ratingDiv.appendChild(upBtn)
+        ratingDiv.appendChild(downBtn)
+        bubbleAndRating.appendChild(ratingDiv)
+      }
+
+      row.appendChild(bubbleAndRating)
       msgArea.appendChild(row)
     })
     if (isTyping) {
@@ -313,7 +444,7 @@
     input.className = "syncchat-input"
     input.type = "text"
     input.placeholder = "Type a message..."
-    input.value = ""
+    input.value = preserveInput ? prevInput : ""
     input.onkeydown = (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
@@ -335,8 +466,13 @@
 
     container.appendChild(chatbox)
 
-    // Focus input
-    setTimeout(() => input.focus(), 100)
+    // Restore scroll position
+    setTimeout(() => {
+      const msgArea = container.querySelector(".syncchat-messages");
+      if (msgArea && prevScroll) msgArea.scrollTop = prevScroll;
+      // Only focus input if not preserving (i.e., just opened)
+      if (!preserveInput) input.focus();
+    }, 0)
   }
 
   const BOT_ID = "12"; // <-- Replace with your actual bot ID
@@ -376,21 +512,27 @@
       })
       .then(data => {
         logDebug("API response parsed");
-        const botText = data.bot_reply || "Sorry, no response."
-        messages.push({ id: Date.now() + 1, text: botText, isBot: true })
-        isTyping = false
+        const botText = data.bot_reply || "Sorry, no response.";
+        // Use the real message id from backend for the bot message
+        messages.push({
+          id: data.bot_message_id, // <-- Use backend-provided message id
+          text: botText,
+          isBot: true,
+          satisfaction: null
+        });
+        isTyping = false;
         // Store conversationId from backend if not already set
         if (data.conversation_id) {
           conversationId = data.conversation_id;
         }
-        render()
+        render();
         // Scroll to bottom
-        const msgArea = container.querySelector(".syncchat-messages")
-        if (msgArea) msgArea.scrollTop = msgArea.scrollHeight
+        const msgArea = container.querySelector(".syncchat-messages");
+        if (msgArea) msgArea.scrollTop = msgArea.scrollHeight;
       })
       .catch(() => {
         logDebug("API error");
-        messages.push({ id: Date.now() + 1, text: "Error contacting bot.", isBot: true })
+        messages.push({ id: Date.now() + 1, text: "Error contacting bot.", isBot: true, satisfaction: null })
         isTyping = false
         render()
       })

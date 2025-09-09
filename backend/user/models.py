@@ -40,3 +40,4 @@ class Message(models.Model):
     sender = models.CharField(max_length=50)  # 'user' or 'bot'
     text = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
+    satisfied = models.BooleanField(null=True, blank=True)

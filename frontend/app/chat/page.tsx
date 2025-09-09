@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState } from "react"
-import { Bot, MessageCircle, X } from "lucide-react"
+import { Bot, MessageCircle, X, ThumbsUp, ThumbsDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -13,6 +13,7 @@ interface Message {
   text: string
   isBot: boolean
   timestamp: Date
+  satisfaction?: boolean | null // true = up, false = down, null = not rated
 }
 
 interface ChatWidgetProps {
@@ -29,6 +30,7 @@ function ChatWidget({ primaryColor = "#a8c69f", secondaryColor = "#96b88a" }: Ch
       text: "Hello! How can I help you today?",
       isBot: true,
       timestamp: new Date(),
+      satisfaction: null,
     },
   ])
   const [isTyping, setIsTyping] = useState(false)
@@ -82,6 +84,12 @@ function ChatWidget({ primaryColor = "#a8c69f", secondaryColor = "#96b88a" }: Ch
     }
   }
 
+  const handleSatisfaction = (msgId: number, value: boolean) => {
+    setMessages((prev) =>
+      prev.map((msg) => (msg.id === msgId ? { ...msg, satisfaction: value } : msg)),
+    )
+  }
+
   return (
     <div className="fixed bottom-6 right-6 z-50">
       {isChatOpen && (
@@ -133,17 +141,52 @@ function ChatWidget({ primaryColor = "#a8c69f", secondaryColor = "#96b88a" }: Ch
                         </AvatarFallback>
                       </Avatar>
                     )}
-                    <div
-                      className={`rounded-lg px-3 py-2 shadow-sm max-w-[200px] ${
-                        msg.isBot ? "bg-white text-gray-800" : "text-white"
-                      }`}
-                      style={
-                        !msg.isBot
-                          ? { background: `linear-gradient(to right, ${primaryColor}, ${secondaryColor})` }
-                          : {}
-                      }
-                    >
-                      <p className="text-sm">{msg.text}</p>
+                    <div>
+                      <div
+                        className={`rounded-lg px-3 py-2 shadow-sm max-w-[200px] ${
+                          msg.isBot ? "bg-white text-gray-800" : "text-white"
+                        }`}
+                        style={
+                          !msg.isBot
+                            ? { background: `linear-gradient(to right, ${primaryColor}, ${secondaryColor})` }
+                            : {}
+                        }
+                      >
+                        <p className="text-sm">{msg.text}</p>
+                      </div>
+                      {/* Satisfaction rating for bot messages */}
+                      {msg.isBot && (
+                        <div className="flex items-center mt-1 space-x-1">
+                          <button
+                            className={`p-1 rounded-full bg-transparent hover:bg-transparent transition ${
+                              msg.satisfaction === true ? "cursor-default" : "cursor-pointer"
+                            }`}
+                            aria-label="Thumbs up"
+                            onClick={() => handleSatisfaction(msg.id, true)}
+                            disabled={msg.satisfaction === true}
+                          >
+                            <ThumbsUp
+                              className="w-4 h-4"
+                              color={msg.satisfaction === true ? "#22c55e" : "#a3a3a3"}
+                              fill="none"
+                            />
+                          </button>
+                          <button
+                            className={`p-1 rounded-full bg-transparent hover:bg-transparent transition ${
+                              msg.satisfaction === false ? "cursor-default" : "cursor-pointer"
+                            }`}
+                            aria-label="Thumbs down"
+                            onClick={() => handleSatisfaction(msg.id, false)}
+                            disabled={msg.satisfaction === false}
+                          >
+                            <ThumbsDown
+                              className="w-4 h-4"
+                              color={msg.satisfaction === false ? "#ef4444" : "#a3a3a3"}
+                              fill="none"
+                            />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
