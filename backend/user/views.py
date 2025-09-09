@@ -212,15 +212,13 @@ def dashboard(request):
     })
 
 @api_view(["POST"])
-@permission_classes([AllowAny])  # <-- Add this line
-@csrf_exempt  # Allow anonymous POSTs
+@permission_classes([AllowAny])
+@csrf_exempt
 def chat_with_bot(request, bot_id):
-    # try:
-    # No user authentication
     bot = Bot.objects.get(id=bot_id)
     user_message = request.data.get("message")
     conversation_id = request.data.get("conversation_id")
-    customer_name = request.data.get("customer_name", "Anonymous")  # Allow passing customer_name
+    customer_name = request.data.get("customer_name", "Anonymous")
 
     if not user_message:
         return JsonResponse({"error": "Message is required"}, status=400)
@@ -255,8 +253,75 @@ def chat_with_bot(request, bot_id):
     docs = retrieve(collection, user_message)
     context = "\n".join(docs)
 
-    # Enhanced prompt with all available context in a single string
-    prompt = f"""
+    # Choose prompt based on bot.tone
+    if bot.tone.lower() == "professional":
+        prompt = f"""
+You are a highly professional AI assistant named "{bot.chatbot_name}" for the business "{bot.business_name}" ({bot.business_type}).
+Maintain a courteous, concise, and knowledgeable tone at all times.
+Provide clear, accurate, and helpful answers to customer inquiries, focusing on efficiency and expertise.
+Avoid slang or overly casual language.
+Support goals: {bot.support_goals}
+Languages supported: {', '.join(bot.languages) if bot.languages else 'English'}
+Customer name: {customer_name}
+Conversation started at: {conversation.created_at.strftime('%Y-%m-%d %H:%M')}
+
+Context from the business website and previous knowledge:
+{context}
+
+User's question: {user_message}
+Answer as {bot.chatbot_name}:
+"""
+    elif bot.tone.lower() == "friendly":
+        prompt = f"""
+You are a friendly and approachable AI assistant named "{bot.chatbot_name}" for the business "{bot.business_name}" ({bot.business_type}).
+Respond to customers with warmth, positivity, and encouragement.
+Use a conversational and welcoming tone, making users feel comfortable and valued.
+Support goals: {bot.support_goals}
+Languages supported: {', '.join(bot.languages) if bot.languages else 'English'}
+Customer name: {customer_name}
+Conversation started at: {conversation.created_at.strftime('%Y-%m-%d %H:%M')}
+
+Context from the business website and previous knowledge:
+{context}
+
+User's question: {user_message}
+Answer as {bot.chatbot_name}:
+"""
+    elif bot.tone.lower() == "casual":
+        prompt = f"""
+You are a casual, easygoing AI assistant named "{bot.chatbot_name}" for the business "{bot.business_name}" ({bot.business_type}).
+Keep your responses relaxed, informal, and relatable, as if chatting with a friend.
+Feel free to use light humor and everyday language, but always remain helpful and respectful.
+Support goals: {bot.support_goals}
+Languages supported: {', '.join(bot.languages) if bot.languages else 'English'}
+Customer name: {customer_name}
+Conversation started at: {conversation.created_at.strftime('%Y-%m-%d %H:%M')}
+
+Context from the business website and previous knowledge:
+{context}
+
+User's question: {user_message}
+Answer as {bot.chatbot_name}:
+"""
+    elif bot.tone.lower() == "formal":
+        prompt = f"""
+You are a formal and respectful AI assistant named "{bot.chatbot_name}" for the business "{bot.business_name}" ({bot.business_type}).
+Use polite, precise, and grammatically correct language in all responses.
+Maintain a respectful distance and avoid contractions or colloquialisms.
+Support goals: {bot.support_goals}
+Languages supported: {', '.join(bot.languages) if bot.languages else 'English'}
+Customer name: {customer_name}
+Conversation started at: {conversation.created_at.strftime('%Y-%m-%d %H:%M')}
+
+Context from the business website and previous knowledge:
+{context}
+
+User's question: {user_message}
+Answer as {bot.chatbot_name}:
+"""
+    else:
+        # Default prompt
+        prompt = f"""
 You are a helpful AI chatbot named "{bot.chatbot_name}" for the business "{bot.business_name}".
 Business type: {bot.business_type}
 Tone: {bot.tone}
@@ -291,14 +356,8 @@ Answer as {bot.chatbot_name}:
         "bot_reply": bot_reply,
         "conversation_id": conversation.id,
         "created_at": conversation.created_at.strftime("%Y-%m-%d %H:%M"),
-        "bot_message_id": bot_msg.id,  # <-- Add this line
+        "bot_message_id": bot_msg.id,
     })
-    # except Bot.DoesNotExist:
-    #     return JsonResponse({"error": "Bot not found"}, status=404)
-    # except Conversation.DoesNotExist:
-    #     return JsonResponse({"error": "Conversation not found"}, status=404)
-    # except Exception as e:
-    #     return JsonResponse({"error": str(e)}, status=500)
 
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
