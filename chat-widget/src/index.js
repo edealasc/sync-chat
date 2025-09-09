@@ -3,6 +3,11 @@
   const primaryColor = "#a8c69f";
   const secondaryColor = "#96b88a";
 
+  // Set your bot's ID and API endpoint here
+  const BOT_ID = "12"; // <-- Replace with your actual bot ID
+  const API_URL = `http://127.0.0.1:8000/api/user/bot/${BOT_ID}/chat/`; // Adjust if your endpoint differs
+  let conversationId = null; // Track conversation ID
+
   // Utility: create element with classes and styles
   function createEl(tag, opts = {}) {
     const el = document.createElement(tag);
@@ -41,15 +46,6 @@
     },
   ];
   let isTyping = false;
-
-  const botResponses = [
-    "That's a great question! Let me help you with that.",
-    "I understand what you're looking for. Here's what I can suggest...",
-    "Thanks for reaching out! I'm here to assist you.",
-    "Let me think about that for a moment...",
-    "I'd be happy to help you with that request!",
-    "That's an interesting point. Here's my perspective...",
-  ];
 
   // Main container
   const container = createEl("div", {
@@ -183,7 +179,11 @@
       outline: "none",
       background: "#f3f4f6",
     },
-    attrs: { placeholder: "Type a message..." },
+    attrs: { 
+      placeholder: "Type a message...",
+      id: "scw-chat-input",         // <-- Add this line
+      name: "scw-chat-input"        // <-- Add this line
+    },
   });
 
   const sendBtn = createEl("button", {
@@ -198,6 +198,7 @@
       cursor: "pointer",
       transition: "background 0.2s",
     },
+    attrs: { type: "button" }, // <-- Prevents form submission/page reload
     html: "Send",
   });
 
@@ -322,7 +323,9 @@
   }
 
   // Send message
-  function sendMessage() {
+  async function sendMessage() {
+    if (!isChatOpen) return; // Prevent sending if chat is closed
+
     const text = input.value.trim();
     if (!text) return;
     messages.push({
@@ -337,18 +340,65 @@
     isTyping = true;
     renderMessages();
 
-    setTimeout(() => {
-      const randomResponse =
-        botResponses[Math.floor(Math.random() * botResponses.length)];
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: text,
+          conversation_id: conversationId,
+          customer_name: "Anonymous",
+        }),
+      });
+
+      if (!res.ok) {
+        let errorMsg = "Network error. Please try again.";
+        try {
+          const data = await res.json();
+          if (data.error) errorMsg = data.error;
+        } catch (fetchErr) {
+          console.error("Error parsing error response:", fetchErr);
+        }
+        console.error("Fetch error:", errorMsg);
+        messages.push({
+          id: Date.now() + 1,
+          text: "Sorry, there was an error: " + errorMsg,
+          isBot: true,
+          timestamp: new Date(),
+        });
+      } else {
+        const data = await res.json();
+        if (data.error) {
+          console.error("API error:", data.error);
+          messages.push({
+            id: Date.now() + 2,
+            text: "Sorry, there was an error: " + data.error,
+            isBot: true,
+            timestamp: new Date(),
+          });
+        } else {
+          conversationId = data.conversation_id;
+          messages.push({
+            id: Date.now() + 3,
+            text: data.bot_reply,
+            isBot: true,
+            timestamp: new Date(),
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Network or unexpected error:", err);
       messages.push({
-        id: Date.now() + 1,
-        text: randomResponse,
+        id: Date.now() + 4,
+        text: "Network error. Please try again.",
         isBot: true,
         timestamp: new Date(),
       });
-      isTyping = false;
-      renderMessages();
-    }, 1500 + Math.random() * 1000);
+    }
+    isTyping = false;
+    renderMessages();
   }
 
   // Event listeners
@@ -360,17 +410,20 @@
     setTimeout(() => input.focus(), 200);
   };
 
+  // Only close chat when closeBtn is clicked
   closeBtn.onclick = () => {
     isChatOpen = false;
     chatBtn.style.display = "flex";
     chatCard.style.display = "none";
   };
 
-  sendBtn.onclick = sendMessage;
+  sendBtn.onclick = () => {
+    if (isChatOpen) sendMessage();
+  };
   input.addEventListener("keypress", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      sendMessage();
+      if (isChatOpen) sendMessage();
     }
   });
 
