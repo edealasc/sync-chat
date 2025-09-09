@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 from django.db.models import Count
 from django.db.models.functions import TruncDate
 from datetime import timedelta
+import re
 
 load_dotenv()
 
@@ -134,7 +135,11 @@ def dashboard(request):
                 "id": convo.id,
                 "customer_name": convo.customer_name,
                 "created_at": convo.created_at.strftime("%Y-%m-%d %H:%M"),
-                "resolved": getattr(convo, "resolved", False),
+                "is_resolved": (
+                    1 if convo.is_resolved is True else
+                    -1 if convo.is_resolved is False else
+                    0
+                ),  # <-- Return as 1, -1, or 0
                 "bot": bot.chatbot_name,
                 "messages": [
                     {
@@ -226,6 +231,10 @@ def chat_with_bot(request, bot_id):
     # Get or create conversation
     if conversation_id:
         conversation = Conversation.objects.get(id=conversation_id, bot=bot)
+        # Option 1: If conversation is resolved and user sends a new message, mark as unresolved
+        if conversation.is_resolved:
+            conversation.is_resolved = False
+            conversation.save()
     else:
         conversation = Conversation.objects.create(
             bot=bot,
@@ -253,6 +262,15 @@ def chat_with_bot(request, bot_id):
     docs = retrieve(collection, user_message)
     context = "\n".join(docs)
 
+    # JSON structure for the AI to return
+    json_instruction = """
+After answering, return your response as a JSON object with the following structure:
+{
+  "message": "<your reply to the user>",
+  "is_resolved": <true or false, depending on whether you believe the user's issue is fully resolved>
+}
+"""
+
     # Choose prompt based on bot.tone
     if bot.tone.lower() == "professional":
         prompt = f"""
@@ -264,6 +282,9 @@ Support goals: {bot.support_goals}
 Languages supported: {', '.join(bot.languages) if bot.languages else 'English'}
 Customer name: {customer_name}
 Conversation started at: {conversation.created_at.strftime('%Y-%m-%d %H:%M')}
+
+Your task is to answer the user's question and also determine if their issue is resolved. 
+{json_instruction}
 
 Context from the business website and previous knowledge:
 {context}
@@ -281,6 +302,9 @@ Languages supported: {', '.join(bot.languages) if bot.languages else 'English'}
 Customer name: {customer_name}
 Conversation started at: {conversation.created_at.strftime('%Y-%m-%d %H:%M')}
 
+Your task is to answer the user's question and also determine if their issue is resolved. 
+{json_instruction}
+
 Context from the business website and previous knowledge:
 {context}
 
@@ -297,6 +321,9 @@ Languages supported: {', '.join(bot.languages) if bot.languages else 'English'}
 Customer name: {customer_name}
 Conversation started at: {conversation.created_at.strftime('%Y-%m-%d %H:%M')}
 
+Your task is to answer the user's question and also determine if their issue is resolved. 
+{json_instruction}
+
 Context from the business website and previous knowledge:
 {context}
 
@@ -312,6 +339,9 @@ Support goals: {bot.support_goals}
 Languages supported: {', '.join(bot.languages) if bot.languages else 'English'}
 Customer name: {customer_name}
 Conversation started at: {conversation.created_at.strftime('%Y-%m-%d %H:%M')}
+
+Your task is to answer the user's question and also determine if their issue is resolved. 
+{json_instruction}
 
 Context from the business website and previous knowledge:
 {context}
@@ -330,6 +360,9 @@ Languages supported: {', '.join(bot.languages) if bot.languages else 'English'}
 Customer name: {customer_name}
 Conversation started at: {conversation.created_at.strftime('%Y-%m-%d %H:%M')}
 
+Your task is to answer the user's question and also determine if their issue is resolved. 
+{json_instruction}
+
 Use the following context from the business website and previous knowledge to answer the user's question.
 
 Context:
@@ -343,7 +376,27 @@ Answer as {bot.chatbot_name}:
     configure(api_key=os.getenv("GEMINI_API_KEY"))
     gemini_model = GenerativeModel("gemini-2.0-flash")
     response = gemini_model.generate_content(prompt)
-    bot_reply = response.text
+    raw_text = response.text.strip()
+
+    # Extract JSON from code block if present
+    def extract_json(text):
+        # Remove code block markers and language hints
+        code_block = re.search(r"```(?:json)?\s*([\s\S]+?)\s*```", text)
+        if code_block:
+            json_str = code_block.group(1)
+        else:
+            json_str = text
+        # Remove any leading/trailing whitespace
+        return json_str.strip()
+
+    try:
+        json_str = extract_json(raw_text)
+        ai_json = json.loads(json_str)
+        bot_reply = ai_json.get("message", raw_text)
+        is_resolved = ai_json.get("is_resolved", False)
+    except Exception:
+        bot_reply = raw_text
+        is_resolved = False
 
     # Save bot message
     bot_msg = Message.objects.create(
@@ -352,8 +405,13 @@ Answer as {bot.chatbot_name}:
         text=bot_reply
     )
 
+    # Update conversation's is_resolved field based on AI response
+    conversation.is_resolved = bool(is_resolved)
+    conversation.save()
+
     return JsonResponse({
         "bot_reply": bot_reply,
+        "is_resolved": is_resolved,
         "conversation_id": conversation.id,
         "created_at": conversation.created_at.strftime("%Y-%m-%d %H:%M"),
         "bot_message_id": bot_msg.id,

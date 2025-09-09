@@ -518,7 +518,6 @@ export default function Dashboard() {
                             <Label value="Seconds" angle={-90} position="insideLeft" />
                           </YAxis>
                           <Tooltip content={<CustomTooltip />} />
-                          {/* <Legend verticalAlign="top" align="right" height={36} wrapperStyle={{ top: 0 }} /> */}
                           <Bar
                             dataKey="response"
                             fill="url(#colorResponse)"
@@ -533,33 +532,32 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
 
+              {/* Issues Resolved per Bot */}
               <Card className="border-0 shadow-lg">
                 <CardHeader>
-                  <CardTitle className="text-lg font-semibold text-gray-900">Top Questions</CardTitle>
-                  <CardDescription>Most frequently asked questions</CardDescription>
+                  <CardTitle className="text-lg font-semibold text-gray-900">Issues Resolved</CardTitle>
+                  <CardDescription>Number of resolved conversations per chatbot</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {[
-                      { question: "How do I reset my password?", count: 156 },
-                      { question: "What are your pricing plans?", count: 134 },
-                      { question: "How do I cancel my subscription?", count: 98 },
-                      { question: "Integration setup help", count: 87 },
-                      { question: "API documentation", count: 76 },
-                    ].map((item, index) => (
-                      <div key={index} className="flex items-center justify-between">
-                        <p className="text-gray-700 flex-1">{item.question}</p>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-20 bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-gradient-to-r from-[#a8c69f] to-[#96b88a] h-2 rounded-full"
-                              style={{ width: `${(item.count / 156) * 100}%` }}
-                            ></div>
+                    {bots.map((bot) => {
+                      // Only count conversations where is_resolved === 1
+                      const resolvedCount = (bot.recent_conversations || []).filter(
+                        (c: any) => c.is_resolved === 1
+                      ).length
+                      return (
+                        <div key={bot.id} className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium text-gray-900">{bot.chatbot_name}</p>
+                            <p className="text-sm text-gray-500">{bot.website_url}</p>
                           </div>
-                          <span className="text-sm font-medium text-gray-900 w-8">{item.count}</span>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-2xl font-bold text-green-700">{resolvedCount}</span>
+                            <span className="text-sm text-gray-500">resolved</span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </CardContent>
               </Card>

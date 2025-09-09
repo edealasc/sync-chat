@@ -31,6 +31,7 @@ class Conversation(models.Model):
     bot = models.ForeignKey('Bot', on_delete=models.CASCADE, related_name='conversations')
     customer_name = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    is_resolved = models.BooleanField(null=True, blank=True) 
 
     def __str__(self):
         return f"Conversation with {self.customer_name} ({self.bot.chatbot_name})"
