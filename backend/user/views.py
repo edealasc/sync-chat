@@ -21,6 +21,8 @@ from django.db.models import Count
 from django.db.models.functions import TruncDate
 from datetime import timedelta
 import re
+import uuid
+from urllib.parse import urlparse
 
 load_dotenv()
 
@@ -99,6 +101,11 @@ def onboarding(request):
     try:
         user = request.user
         data = request.data
+
+        allowed_domains = data.get("allowedDomains", [])
+
+        embed_code = str(uuid.uuid4())  # Generate a unique embed code
+
         bot = Bot.objects.create(
             user=user,
             website_url=data.get("websiteUrl", ""),
@@ -108,15 +115,14 @@ def onboarding(request):
             tone=data.get("tone", ""),
             support_goals=data.get("supportGoals", ""),
             languages=data.get("languages", ["English"]),
-            status="crawling",  # Set initial status
+            allowed_domains=allowed_domains,
+            status="crawling",
+            embed_code=embed_code,  # <-- Set embed code here
         )
-        # Set the collection name and save the bot object
         bot.collection_name = f"bot_{bot.id}_collection"
         bot.save()
-        
-        # Trigger async crawling and embedding
         crawl_and_embed.delay(bot.id, bot.website_url)
-        return JsonResponse({"success": True, "bot_id": bot.id})
+        return JsonResponse({"success": True, "bot_id": bot.id, "embed_code": embed_code})  # <-- Return embed code
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)
 
@@ -219,8 +225,39 @@ def dashboard(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 @csrf_exempt
-def chat_with_bot(request, bot_id):
-    bot = Bot.objects.get(id=bot_id)
+def chat_with_bot(request, embed_code):  # <-- changed from bot_id to embed_code
+    try:
+        bot = Bot.objects.get(embed_code=embed_code)  # <-- lookup by embed_code
+    except Bot.DoesNotExist:
+        return JsonResponse({"error": "Bot not found"}, status=404)
+
+    # --- Domain restriction logic ---
+    # Get the origin or referer from headers
+    origin = request.META.get("HTTP_ORIGIN") or request.META.get("HTTP_REFERER")
+    if not origin:
+        return JsonResponse({"error": "Missing origin/referer header"}, status=403)
+
+    # Extract domain from origin
+    parsed = urlparse(origin)
+    request_domain = parsed.hostname
+
+    # Normalize allowed domains (strip protocol, www, trailing slashes)
+    def normalize_domain(domain):
+        parsed = urlparse(domain if domain.startswith("http") else "http://" + domain)
+        host = parsed.hostname or domain
+        if host.startswith("www."):
+            host = host[4:]
+        return host.lower()
+
+    allowed_domains = [normalize_domain(d) for d in bot.allowed_domains]
+    if request_domain and request_domain.startswith("www."):
+        request_domain = request_domain[4:]
+    request_domain = (request_domain or "").lower()
+
+    if request_domain not in allowed_domains:
+        return JsonResponse({"error": "Domain not allowed"}, status=403)
+    # --- End domain restriction ---
+
     user_message = request.data.get("message")
     conversation_id = request.data.get("conversation_id")
     customer_name = request.data.get("customer_name", "Anonymous")

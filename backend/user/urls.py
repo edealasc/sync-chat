@@ -8,6 +8,6 @@ urlpatterns = [
     path('token/refresh/', views.token_refresh, name='token_refresh'),
     path('onboarding/', views.onboarding, name='onboarding'),
     path("dashboard/", dashboard, name="dashboard"),
-    path("bot/<int:bot_id>/chat/", chat_with_bot, name="chat_with_bot"),
+    path("bot/<str:embed_code>/chat/", chat_with_bot, name="chat_with_bot"),
     path("message/<int:message_id>/toggle_satisfaction/", toggle_message_satisfaction, name="toggle_message_satisfaction"),
 ]

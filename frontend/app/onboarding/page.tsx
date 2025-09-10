@@ -25,14 +25,16 @@ export default function OnboardingPage() {
     chatbotName: "",
     tone: "",
     languages: ["English"],
+    allowedDomains: [] as string[], // <-- Add allowedDomains to formData
   })
+  const [domainInput, setDomainInput] = useState("") // <-- For domain input field
   const [botId, setBotId] = useState<number | null>(null)
   const [botStatus, setBotStatus] = useState<string | null>(null)
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
 
   const router = useRouter()
 
-  const totalSteps = 3
+  const totalSteps = 4 // <-- Increase total steps to 4
 
   const handleNext = () => {
     if (currentStep < totalSteps) {
@@ -91,8 +93,26 @@ export default function OnboardingPage() {
     // Don't set isProcessing to false here, let polling handle redirect
   }
 
-  const updateFormData = (field: string, value: string) => {
+  const updateFormData = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const handleAddDomain = () => {
+    const trimmed = domainInput.trim()
+    if (
+      trimmed &&
+      !formData.allowedDomains.includes(trimmed)
+    ) {
+      updateFormData("allowedDomains", [...formData.allowedDomains, trimmed])
+      setDomainInput("")
+    }
+  }
+
+  const handleRemoveDomain = (domain: string) => {
+    updateFormData(
+      "allowedDomains",
+      formData.allowedDomains.filter((d) => d !== domain)
+    )
   }
 
   if (isProcessing) {
@@ -333,6 +353,65 @@ export default function OnboardingPage() {
               <div className="space-y-6 animate-slide-in">
                 <div>
                   <Badge variant="outline" className="mb-4">
+                    Allowed Domains
+                  </Badge>
+                  <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                    Where will you use this chatbot?
+                  </h2>
+                  <p className="text-gray-600 mb-4 text-sm">
+                    Enter all the domains (e.g., <span className="font-mono">yourwebsite.com</span>, <span className="font-mono">help.yourwebsite.com</span>) where you plan to embed this bot. The chatbot will only work on these domains.
+                  </p>
+                </div>
+                <div>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="e.g. yourwebsite.com"
+                      value={domainInput}
+                      onChange={(e) => setDomainInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault()
+                          handleAddDomain()
+                        }
+                      }}
+                    />
+                    <Button type="button" onClick={handleAddDomain} disabled={!domainInput.trim()}>
+                      Add
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-4">
+                    {formData.allowedDomains.length === 0 && (
+                      <span className="text-xs text-gray-400">No domains added yet.</span>
+                    )}
+                    {formData.allowedDomains.map((domain) => (
+                      <Badge
+                        key={domain}
+                        variant="secondary"
+                        className="flex items-center gap-1 px-2 py-1"
+                      >
+                        <span>{domain}</span>
+                        <button
+                          type="button"
+                          className="ml-1 text-gray-500 hover:text-red-500"
+                          onClick={() => handleRemoveDomain(domain)}
+                          aria-label={`Remove ${domain}`}
+                        >
+                          ×
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    You can add or remove domains later in your dashboard.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {currentStep === 4 && (
+              <div className="space-y-6 animate-slide-in">
+                <div>
+                  <Badge variant="outline" className="mb-4">
                     Final Setup
                   </Badge>
                   <h2 className="text-xl font-semibold text-gray-900 mb-4">Review and launch</h2>
@@ -354,6 +433,14 @@ export default function OnboardingPage() {
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-gray-700">Tone:</span>
                     <span className="text-sm text-gray-900 capitalize">{formData.tone}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-gray-700">Allowed Domains:</span>
+                    <span className="text-sm text-gray-900">
+                      {formData.allowedDomains.length > 0
+                        ? formData.allowedDomains.join(", ")
+                        : "None"}
+                    </span>
                   </div>
                 </div>
 
@@ -387,7 +474,8 @@ export default function OnboardingPage() {
               onClick={handleNext}
               disabled={
                 (currentStep === 1 && (!formData.websiteUrl || !formData.businessName || !formData.businessType)) ||
-                (currentStep === 2 && (!formData.chatbotName || !formData.tone))
+                (currentStep === 2 && (!formData.chatbotName || !formData.tone)) ||
+                (currentStep === 3 && formData.allowedDomains.length === 0)
               }
               className="px-6 bg-gradient-to-r from-[#a8c69f] to-[#96b88a] hover:from-[#96b88a] to-[#84a578] text-white border-0"
             >

@@ -475,8 +475,17 @@
     }, 0)
   }
 
-  const BOT_ID = "12"; // <-- Replace with your actual bot ID
-  const API_URL = `http://127.0.0.1:8000/api/user/bot/${BOT_ID}/chat/`;
+  // Get embed code from script tag
+  const script = document.currentScript;
+  const embedCode = script ? script.getAttribute("data-embed-code") : null;
+
+  if (!embedCode) {
+    console.error("SyncChat: data-embed-code attribute missing on script tag.");
+    return;
+  }
+
+  // Use embedCode in API URL
+  const API_URL = `http://127.0.0.1:8000/api/user/bot/${encodeURIComponent(embedCode)}/chat/`;
 
   // Send message
   function sendMessage(e) {

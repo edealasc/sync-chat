@@ -23,6 +23,8 @@ class Bot(models.Model):
     languages = models.JSONField(default=list, blank=True)
     status = models.CharField(max_length=20, default="active")  # e.g. active, crawling, paused
     collection_name = models.CharField(max_length=100, unique=True, blank=True)
+    embed_code = models.TextField(blank=True)  # New field for embed code
+    allowed_domains = models.JSONField(default=list, blank=True)  # New field for allowed domains
 
     def __str__(self):
         return f"{self.chatbot_name} ({self.website_url})"
