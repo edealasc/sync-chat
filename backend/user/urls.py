@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .views import dashboard, chat_with_bot, toggle_message_satisfaction  # Add toggle_message_satisfaction import
+from .views import dashboard, chat_with_bot, toggle_message_satisfaction, add_bot  # Add add_bot import
 
 urlpatterns = [
     path('register/', views.register, name='register'),
@@ -10,4 +10,5 @@ urlpatterns = [
     path("dashboard/", dashboard, name="dashboard"),
     path("bot/<str:embed_code>/chat/", chat_with_bot, name="chat_with_bot"),
     path("message/<int:message_id>/toggle_satisfaction/", toggle_message_satisfaction, name="toggle_message_satisfaction"),
+    path("add_bot/", add_bot, name="add_bot"),  # New URL pattern for add_bot
 ]

@@ -479,3 +479,34 @@ def toggle_message_satisfaction(request, message_id):
         return JsonResponse({"success": True, "message_id": msg.id, "satisfied": msg.satisfied})
     except Message.DoesNotExist:
         return JsonResponse({"error": "Message not found"}, status=404)
+
+@api_view(["POST"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def add_bot(request):
+    try:
+        user = request.user
+        data = request.data
+
+        allowed_domains = data.get("allowedDomains", [])
+        embed_code = str(uuid.uuid4())
+
+        bot = Bot.objects.create(
+            user=user,
+            website_url=data.get("websiteUrl", ""),
+            business_name=data.get("businessName", ""),
+            business_type=data.get("businessType", ""),
+            chatbot_name=data.get("chatbotName", ""),
+            tone=data.get("tone", ""),
+            support_goals=data.get("supportGoals", ""),
+            languages=data.get("languages", ["English"]),
+            allowed_domains=allowed_domains,
+            status="crawling",
+            embed_code=embed_code,
+        )
+        bot.collection_name = f"bot_{bot.id}_collection"
+        bot.save()
+        crawl_and_embed.delay(bot.id, bot.website_url)
+        return JsonResponse({"success": True, "bot_id": bot.id, "embed_code": embed_code})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
