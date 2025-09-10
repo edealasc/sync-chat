@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { apiRequest } from "@/lib/api"
+import { apiRequest, getUserInfo, isThereToken } from "@/lib/api"
+import { useRouter } from "next/navigation"
 import {
   Bot,
   Globe,
@@ -13,6 +14,7 @@ import {
   TrendingUp,
   CheckCircle,
   Pause,
+  User, // Add this import
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -37,6 +39,8 @@ function computeSatisfaction(messages: any[]) {
 }
 
 export default function Dashboard() {
+  const router = useRouter()
+  const [user, setUser] = useState<{ name: string; email: string } | null>(null)
   const [bots, setBots] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedChatbot, setSelectedChatbot] = useState(null)
@@ -85,6 +89,16 @@ export default function Dashboard() {
     }
     fetchAnalytics()
   }, [selectedRange])
+
+  useEffect(() => {
+    // Redirect if not signed in
+    if (!isThereToken()) {
+      router.replace("/")
+      return
+    }
+    // Get user info from localStorage
+    setUser(getUserInfo())
+  }, [router])
 
   if (loading) return <div>Loading...</div>
 
@@ -135,14 +149,16 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <Button variant="outline" size="sm">
-                <Settings className="w-4 h-4 mr-2" />
-                Settings
-              </Button>
-              <Avatar>
-                <AvatarImage src="/placeholder.svg?height=32&width=32" />
-                <AvatarFallback>JD</AvatarFallback>
-              </Avatar>
+              {/* Replace Avatar with User icon and user info */}
+              {user && (
+                <div className="flex items-center space-x-2">
+                  <User className="w-6 h-6 text-gray-700" />
+                  <div>
+                    <span className="font-semibold text-gray-900">{user.name}</span>
+                    <span className="text-xs text-gray-500 block">{user.email}</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -647,16 +663,25 @@ export default function Dashboard() {
                   <div className="text-xs text-gray-500 mb-1">Languages</div>
                   <div className="flex flex-wrap gap-2">
                     {(modalBot.languages || []).map((lang: string, idx: number) => (
-                      <Badge key={idx} variant="secondary" className="text-xs">
+                      <Badge key={idx} variant="outline" className="text-gray-900">
                         {lang.charAt(0).toUpperCase() + lang.slice(1)}
                       </Badge>
                     ))}
                   </div>
                 </div>
-                <div>
-                  <div className="text-xs text-gray-500 mb-1">Total Conversations</div>
-                  <div className="font-semibold text-gray-900">{modalBot.conversation_count}</div>
-                </div>
+              </div>
+              <div className="px-8 py-4 bg-gray-50 border-t">
+                <Button
+                  variant="default"
+                  className="w-full flex items-center justify-center"
+                  onClick={() => {
+                    // Handle edit bot action
+                    router.push(`/bots/edit/${modalBot.id}`)
+                  }}
+                >
+                  <Zap className="w-4 h-4 mr-2" />
+                  Edit Bot
+                </Button>
               </div>
             </div>
           )}

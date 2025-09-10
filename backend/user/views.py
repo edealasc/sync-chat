@@ -75,6 +75,10 @@ def token_obtain_pair(request):
         return JsonResponse({
             "access": str(refresh.access_token),
             "refresh": str(refresh),
+            "user": {
+                "name": user.first_name or user.email,
+                "email": user.email,
+            }
         })
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)

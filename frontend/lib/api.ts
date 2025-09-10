@@ -104,6 +104,10 @@ export async function login(email: string, password: string) {
   const json = await apiRequest("api/user/token/", "POST", { email, password });
   if (json.access && json.refresh) {
     setTokens(json.access, json.refresh);
+    if (json.user) {
+      localStorage.setItem("user_name", json.user.name || "");
+      localStorage.setItem("user_email", json.user.email || "");
+    }
     if (typeof window !== "undefined" && "has_profile" in json) {
       localStorage.setItem("has_profile", json.has_profile ? "true" : "false");
     }
@@ -111,7 +115,22 @@ export async function login(email: string, password: string) {
   return json;
 }
 
+// Add helper to get user info
+export function getUserInfo() {
+  if (typeof window === "undefined") return null;
+  return {
+    name: localStorage.getItem("user_name") || "",
+    email: localStorage.getItem("user_email") || "",
+  };
+}
+
 export function logout() {
   clearTokens();
+}
+
+export function isThereToken(): boolean {
+  if (typeof window === "undefined") return false;
+  const token = localStorage.getItem("access");
+  return !!token;
 }
 

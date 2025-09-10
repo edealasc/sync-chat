@@ -27,7 +27,7 @@ export default function SignInPage() {
       if (res.error) {
         setError(res.error)
       } else if (res.access && res.refresh) {
-        router.push("/") // Redirect to home or dashboard
+        router.push("/dashboard") // Redirect to home or dashboard
       } else {
         setError("Invalid response from server")
       }
