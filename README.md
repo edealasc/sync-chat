@@ -1,6 +1,9 @@
 # SyncChat – AI Chatbots for Websites 🤖💬
 
-Paste a website URL → SyncChat crawls the content → Embed a context-aware AI chatbot.
+### Paste a website URL → SyncChat crawls the content → Embed a context-aware AI chatbot.
+
+![Screenshot](images/hero.png)
+
 
 ---
 
