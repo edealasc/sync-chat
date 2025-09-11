@@ -42,8 +42,34 @@ Output format:
         pass
     return [query]
 
-def retrieve(collection, query, context, top_k=5, multi_query_n=3):
-    # Generate multiple queries using Gemini, passing context
+def generate_hyde_query(query, context):
+    """
+    Use Gemini to generate a hypothetical answer (HyDE) for the user's query, considering bot context.
+    """
+    configure(api_key=os.getenv("GEMINI_API_KEY"))
+    gemini_model = GenerativeModel("gemini-2.0-flash")
+    prompt = f"""
+Given the following user query and bot context, generate a detailed, plausible hypothetical answer as if you were the bot responding to the user. 
+This answer should be informative and contextually relevant, even if you are not certain of the exact facts. 
+Return only the answer text, no explanations or formatting.
+
+Bot context:
+{context}
+
+User query: "{query}"
+Hypothetical answer:
+"""
+    response = gemini_model.generate_content(prompt)
+    hyde_answer = response.text.strip()
+    return hyde_answer
+
+def retrieve(collection, query, context, top_k=5, multi_query_n=3, hyde_fallback=True, min_docs=1):
+    """
+    Retrieve documents using multi-query RAG. If not enough relevant documents are found,
+    use HyDE as a fallback to generate a hypothetical answer and retrieve again.
+    Returns deduplicated documents from both strategies if fallback is triggered.
+    """
+    # Multi-query retrieval
     queries = generate_multi_queries(query, context, n=multi_query_n)
     all_docs = []
     for q in queries:
@@ -59,6 +85,20 @@ def retrieve(collection, query, context, top_k=5, multi_query_n=3):
         if doc not in seen:
             deduped_docs.append(doc)
             seen.add(doc)
+
+    # HyDE fallback if not enough docs
+    if hyde_fallback and len(deduped_docs) < min_docs:
+        hyde_query = generate_hyde_query(query, context)
+        hyde_results = collection.query(
+            query_texts=[hyde_query],
+            n_results=top_k
+        )
+        hyde_docs = hyde_results.get('documents', [[]])[0]
+        for doc in hyde_docs:
+            if doc not in seen:
+                deduped_docs.append(doc)
+                seen.add(doc)
+
     return deduped_docs
 
 # if __name__ == "__main__":
@@ -69,25 +109,30 @@ def retrieve(collection, query, context, top_k=5, multi_query_n=3):
 #             return {
 #                 'documents': [[f"Mock doc for: {qt}" for qt in query_texts]]
 #             }
-
+#
 #     # Example user query
 #     user_query = "What books does your company sell?"
-
+#
 #     # Example bot context
 #     bot_context = "We sell a variety of books including fiction, non-fiction, and educational materials."
-
+#
 #     # Instantiate mock collection
 #     collection = MockCollection()
-
+#
 #     # Generate multi-queries
 #     queries = generate_multi_queries(user_query, bot_context, n=2)
 #     print("Generated queries:")
 #     for q in queries:
 #         print(q)
-
+#
+#     # Generate HyDE query
+#     hyde = generate_hyde_query(user_query, bot_context)
+#     print("\nHyDE query:")
+#     print(hyde)
+#
 #     # Call retrieve with mock data
-#     results = retrieve(collection, user_query, bot_context, top_k=2, multi_query_n=2)
-
+#     results = retrieve(collection, user_query, bot_context, top_k=2, multi_query_n=2, use_hyde=True)
+#
 #     print("\nRetrieved documents:")
 #     for doc in results:
 #         print(doc)
