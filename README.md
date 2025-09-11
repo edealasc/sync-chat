@@ -42,6 +42,15 @@ SyncChat is an AI-powered chatbot platform that enables users to create, deploy,
 
 ---
 
+## Tech Stack 🛠️
+
+- **Backend:** Python, Django, Django REST Framework, ChromaDB, Google Gemini, PostgreSQL-ready
+- **Frontend:** Next.js, React, TypeScript, Tailwind CSS
+- **Widget:** Vanilla JS, Vite
+- **Testing:** Django test framework, Jest + React Testing Library, Cypress for widget
+
+---
+
 ## RAG (Retrieval-Augmented Generation) Pipeline 🧠
 
 SyncChat uses a robust RAG pipeline for context-aware answers:
@@ -65,53 +74,42 @@ SyncChat uses a robust RAG pipeline for context-aware answers:
 
 ---
 
-## Scalability Features ⚙️
+### Backend
 
-- Async crawling for large websites.
-- Embedding caching to reduce API calls.
-- Token-window management for long conversations.
-- PostgreSQL-ready architecture for production.
+The backend is the core engine of the platform, built with Django to provide secure, scalable, and efficient management of users, chatbots, and chat interactions. It orchestrates authentication, bot configuration, conversation handling, and seamless integration with the RAG pipeline.
 
----
+- **User Authentication:**  
+  Implements robust user authentication and authorization, ensuring that only registered users can access bot management and chat functionalities. Security measures include encrypted password storage and session management.
 
-## Security Considerations 🔒
+- **Chatbot Management:**  
+  Allows users to create and configure chatbots with custom settings, including specifying allowed domains to restrict where bots can be deployed. Each chatbot is assigned a unique embed code for easy integration into websites. The backend enforces domain restrictions and manages bot-specific configurations.
 
-- JWT authentication for API access.
-- XSS mitigation in embedded widgets.
-- Rate-limited API endpoints.
-- CORS restrictions configured for allowed domains only.
+- **Chat System:**  
+  Handles real-time chat interactions using Gemini. Maintains detailed conversation history for each user and bot, enabling context-aware responses and analytics. Conversation logs are securely stored and can be accessed for review and improvement.
 
----
-
+- **Interaction with RAG Pipeline:**  
+  Coordinates with the RAG pipeline by storing and serving embedded website content. When a chat request is received, the backend retrieves relevant documents and context from the RAG system to enhance response accuracy and relevance.
 
 
 ---
 
-## Screenshots & Examples 🖥️
+### Dashboard
 
-**Dashboard Analytics:**  
-*Add screenshot here*
+The dashboard is the main interface for users to manage and monitor their AI chatbots, providing actionable insights and controls for optimization.
 
-**Multi-site Management:**  
-*Add screenshot here*
+- **Chatbot & Conversation Management:**  
+  Users can view, create, and edit chatbots, access recent conversations, and review detailed histories. Modal dialogs allow for in-depth bot and conversation details, including business info, support goals, and language settings.
 
-**Sample Chat 💬:**
+- **Performance & Analytics:**  
+  Displays key metrics such as total conversations, average response times, satisfaction rates, and active chatbot count. Interactive charts visualize conversation volume, response times, issue resolution, satisfaction scores, and language distribution.
 
-| User | Bot |
-|------|-----|
-| “What services does this company offer?” | “SyncChat provides AI-powered chatbots, automatic website crawling, and analytics dashboards.” |
-| “Can it manage multiple websites?” | “Yes, you can create and manage multiple chatbots from one dashboard.” |
+- **Real-Time Updates & User Tools:**  
+  Features live updates on bot status and user activity, with user-friendly tools for filtering data, selecting date ranges, and quickly navigating between chatbots, conversations, and analytics.
 
----
-
-## Tech Stack 🛠️
-
-- **Backend:** Python, Django, Django REST Framework, ChromaDB, Google Gemini, PostgreSQL-ready
-- **Frontend:** Next.js, React, TypeScript, Tailwind CSS
-- **Widget:** Vanilla JS, Vite
-- **Testing:** Django test framework, Jest + React Testing Library, Cypress for widget
 
 ---
+
+
 
 ## Setup ⚡
 
