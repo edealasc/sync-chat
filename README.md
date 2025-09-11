@@ -7,13 +7,10 @@
 
 ---
 
-## Live Demo 🚀
-
 ## Overview 🌐
 
-SyncChat enables anyone to add an intelligent chatbot to their website with zero setup. Our chatbots understand multi-turn conversations, maintain context, and continuously improve from user feedback.
+SyncChat is an AI-powered chatbot platform that enables users to create, deploy, and manage intelligent chatbots for their websites. It features a modern frontend, a Django backend, and a retrieval-augmented generation (RAG) pipeline that crawls and indexes website content to deliver accurate, context-aware responses and real-time analytics.
 
-This project demonstrates full-stack engineering skills, including AI/ML integration, scalable architecture, and production-quality frontend & backend.
 
 ---
 
@@ -25,20 +22,27 @@ This project demonstrates full-stack engineering skills, including AI/ML integra
 
 ---
 
-## Architecture 🏗️
+## Features ✨
 
-```
-User Website
-    |
-    v
-[Chat Widget] ---> [Django REST API] ---> [ChromaDB Vector Store]
-                                        \
-                                         -> LLM (Google Gemini)
-```
+- **Context-aware AI Chatbot 🤖:** Multi-turn conversations with dynamic memory.
+- **Zero Setup 🛠️:** Paste a URL, and the knowledge base builds automatically.
+- **Multi-Site Management 🌍:** Manage multiple chatbots in one dashboard.
+- **Embeddable Widget 🖼️:** Lightweight JS script, safe to include anywhere.
+- **Personalization 🎨:** Tone, language, and goals per chatbot.
+- **Analytics 📈:** Track chats/day, user satisfaction, and trending questions.
+- **Integrations 🔗:** Export conversations to CSV, Slack, Notion.
+- **Feedback Loop 🔁:** Collect user ratings to refine responses.
 
 ---
 
-## RAG (Retrieval-Augmented Generation) System 🧠
+## Architecture 🏗️
+
+![Screenshot](images/diagram.png)
+
+
+---
+
+## RAG (Retrieval-Augmented Generation) Pipeline 🧠
 
 SyncChat uses a robust RAG pipeline for context-aware answers:
 
@@ -79,16 +83,7 @@ SyncChat uses a robust RAG pipeline for context-aware answers:
 
 ---
 
-## Features ✨
 
-- **Context-aware AI Chatbot 🤖:** Multi-turn conversations with dynamic memory.
-- **Zero Setup 🛠️:** Paste a URL, and the knowledge base builds automatically.
-- **Multi-Site Management 🌍:** Manage multiple chatbots in one dashboard.
-- **Embeddable Widget 🖼️:** Lightweight JS script, safe to include anywhere.
-- **Personalization 🎨:** Tone, language, and goals per chatbot.
-- **Analytics 📈:** Track chats/day, user satisfaction, and trending questions.
-- **Integrations 🔗:** Export conversations to CSV, Slack, Notion.
-- **Feedback Loop 🔁:** Collect user ratings to refine responses.
 
 ---
 
