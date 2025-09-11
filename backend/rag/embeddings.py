@@ -1,38 +1,40 @@
 import pandas as pd
-import chromadb
 from chromadb.utils import embedding_functions
+import chromadb
 from transformers import AutoTokenizer
 import nltk
 from nltk.tokenize import sent_tokenize
 from functools import lru_cache
 from io import StringIO
-import math
+from typing import List, Dict, Optional
+
+# -------------------------------
+# NLTK setup
+# -------------------------------
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt')
 
 # -------------------------------
 # Centralized tokenizer
 # -------------------------------
-# Make sure this tokenizer is imported in other modules instead of initializing again
 tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-MiniLM-L6-v2")
-
-# -------------------------------
-# NLTK sentence tokenizer
-# -------------------------------
-nltk.download('punkt')
 
 # -------------------------------
 # Token counting with caching
 # -------------------------------
 @lru_cache(maxsize=100000)
-def count_tokens(text):
+def count_tokens(text: str) -> int:
     return len(tokenizer.encode(text, add_special_tokens=False))
 
 # -------------------------------
 # Sliding-window chunking
 # -------------------------------
-def chunk_text(text, max_tokens=400, overlap_tokens=80):
+def chunk_text(text: str, max_tokens: int = 400, overlap_tokens: int = 80) -> List[str]:
     sentences = sent_tokenize(text)
-    chunks = []
-    current_chunk = []
+    chunks: List[str] = []
+    current_chunk: List[str] = []
     current_len = 0
 
     for sentence in sentences:
@@ -40,8 +42,8 @@ def chunk_text(text, max_tokens=400, overlap_tokens=80):
         if current_len + sentence_len > max_tokens:
             if current_chunk:
                 chunks.append(' '.join(current_chunk))
-            # Start new chunk with overlap
-            overlap_chunk = []
+            # Create overlap for next chunk
+            overlap_chunk: List[str] = []
             overlap_len = 0
             if overlap_tokens > 0:
                 for s in reversed(current_chunk):
@@ -58,13 +60,18 @@ def chunk_text(text, max_tokens=400, overlap_tokens=80):
 
     if current_chunk:
         chunks.append(' '.join(current_chunk))
+
     return chunks
 
 # -------------------------------
-# Create embeddings from CSV with incremental & batched add
+# Create embeddings from CSV data
 # -------------------------------
-def create_embeddings_from_csv(csv_data, collection_name="rag_collection", persist_path="chromadb_data", batch_size=500):
-    # Read CSV data from string
+def create_embeddings_from_csv(
+    csv_data: str,
+    collection_name: str = "rag_collection",
+    persist_path: str = "chromadb_data",
+    batch_size: int = 500
+) -> chromadb.api.models.Collection.Collection:
     df = pd.read_csv(StringIO(csv_data))
 
     # Initialize ChromaDB embedding function
@@ -75,27 +82,27 @@ def create_embeddings_from_csv(csv_data, collection_name="rag_collection", persi
     # Initialize ChromaDB PersistentClient
     chroma_client = chromadb.PersistentClient(path=persist_path)
 
-    # Create or get the collection
+    # Get or create collection
     collection = chroma_client.get_or_create_collection(
         name=collection_name,
         embedding_function=sentence_transformer_ef
     )
 
-    # Prepare chunks and metadata
-    all_texts, all_metadatas, all_ids = [], [], []
+    all_texts: List[str] = []
+    all_metadatas: List[Dict] = []
+    all_ids: List[str] = []
 
     for idx, row in df.iterrows():
-        text = row['text']
-        url = row.get('url', '')
-        section_title = row.get('section_title', '')
+        text = str(row.get('text', ''))
+        url = str(row.get('url', ''))
+        section_title = str(row.get('section_title', ''))
         doc_id = str(idx)
 
         chunks = chunk_text(text, max_tokens=400, overlap_tokens=80)
         for i, chunk in enumerate(chunks):
             chunk_id = f"{doc_id}_{i}"
-            # Skip if this chunk already exists in collection
-            if collection.get(ids=[chunk_id])['ids']:
-                continue
+
+            # Batch add
             all_texts.append(chunk)
             all_metadatas.append({
                 'doc_id': doc_id,
@@ -105,7 +112,6 @@ def create_embeddings_from_csv(csv_data, collection_name="rag_collection", persi
             })
             all_ids.append(chunk_id)
 
-            # Batch add to collection
             if len(all_texts) >= batch_size:
                 collection.add(documents=all_texts, metadatas=all_metadatas, ids=all_ids)
                 all_texts, all_metadatas, all_ids = [], [], []
