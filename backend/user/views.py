@@ -510,3 +510,48 @@ def add_bot(request):
         return JsonResponse({"success": True, "bot_id": bot.id, "embed_code": embed_code})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def bot_info(request, embed_code):
+    """
+    Returns public info about a bot given its embed code.
+    Only if the request is from an allowed domain.
+    """
+    try:
+        bot = Bot.objects.get(embed_code=embed_code)
+    except Bot.DoesNotExist:
+        return JsonResponse({"error": "Bot not found"}, status=404)
+
+    # --- Domain restriction logic ---
+    origin = request.META.get("HTTP_ORIGIN") or request.META.get("HTTP_REFERER")
+    if not origin:
+        return JsonResponse({"error": "Missing origin/referer header"}, status=403)
+
+    from urllib.parse import urlparse
+    def normalize_domain(domain):
+        parsed = urlparse(domain if domain.startswith("http") else "http://" + domain)
+        host = parsed.hostname or domain
+        if host.startswith("www."):
+            host = host[4:]
+        return host.lower()
+
+    allowed_domains = [normalize_domain(d) for d in bot.allowed_domains]
+    parsed = urlparse(origin)
+    request_domain = parsed.hostname
+    if request_domain and request_domain.startswith("www."):
+        request_domain = request_domain[4:]
+    request_domain = (request_domain or "").lower()
+
+    if request_domain not in allowed_domains:
+        return JsonResponse({"error": "Domain not allowed"}, status=403)
+    # --- End domain restriction ---
+
+    return JsonResponse({
+        "chatbot_name": bot.chatbot_name,
+        "business_name": bot.business_name,
+        "business_type": bot.business_type,
+        "website_url": bot.website_url,
+        "theme_color": getattr(bot, "theme_color", None),
+        "status": bot.status,
+    })

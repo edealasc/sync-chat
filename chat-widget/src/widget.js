@@ -11,6 +11,30 @@
     document.head.appendChild(markedScript);
   }
 
+  // Get embed code and theme color from script tag
+  const script = document.currentScript;
+  const embedCode = script ? script.getAttribute("data-embed-code") : null;
+  // Default to green if not set
+  const themeColor = script ? (script.getAttribute("data-theme-color") || "#96b88a") : "#96b88a";
+
+  if (!embedCode) {
+    console.error("SyncChat: data-embed-code attribute missing on script tag.");
+    return;
+  }
+
+  // Helper to lighten/darken color (simple HSL manipulation)
+  function shadeColor(color, percent) {
+    // Accepts hex color, returns hex
+    let r = parseInt(color.slice(1,3),16), g = parseInt(color.slice(3,5),16), b = parseInt(color.slice(5,7),16);
+    r = Math.min(255, Math.max(0, r + Math.round(255 * percent)));
+    g = Math.min(255, Math.max(0, g + Math.round(255 * percent)));
+    b = Math.min(255, Math.max(0, b + Math.round(255 * percent)));
+    return "#" + [r,g,b].map(x=>x.toString(16).padStart(2,"0")).join("");
+  }
+  // Generate gradient stops
+  const color1 = shadeColor(themeColor, 0.12); // lighter
+  const color2 = themeColor; // base
+
   // Styles
   const style = document.createElement("style")
   style.innerHTML = `
@@ -35,7 +59,7 @@
     @keyframes syncchat-fadein { from { opacity: 0; } to { opacity: 1; } }
     .syncchat-header {
       padding: 16px;
-      background: linear-gradient(to right, #a8c69f, #96b88a);
+      background: linear-gradient(to right, ${color1}, ${color2});
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -92,7 +116,7 @@
       width: 24px;
       height: 24px;
       border-radius: 50%;
-      background: linear-gradient(to bottom right, #a8c69f, #96b88a);
+      background: linear-gradient(to bottom right, ${color1}, ${color2});
       display: flex;
       align-items: center;
       justify-content: center;
@@ -105,11 +129,10 @@
       box-shadow: 0 1px 4px rgba(0,0,0,0.04);
       background: #fff;
       color: #222;
-      /* Markdown styles */
       word-break: break-word;
     }
     .syncchat-msgbubble.user {
-      background: linear-gradient(to right, #a8c69f, #96b88a);
+      background: linear-gradient(to right, ${color1}, ${color2});
       color: #fff;
     }
     .syncchat-msgbubble a { color: #2563eb; text-decoration: underline; word-break: break-all; }
@@ -151,7 +174,7 @@
       outline: none;
     }
     .syncchat-sendbtn {
-      background: linear-gradient(to right, #a8c69f, #96b88a);
+      background: linear-gradient(to right, ${color1}, ${color2});
       color: #fff;
       border: none;
       border-radius: 8px;
@@ -164,7 +187,7 @@
       width: 56px;
       height: 56px;
       border-radius: 50%;
-      background: linear-gradient(to right, #a8c69f, #96b88a);
+      background: linear-gradient(to right, ${color1}, ${color2});
       color: #fff;
       box-shadow: 0 2px 8px rgba(0,0,0,0.12);
       border: none;
@@ -213,6 +236,21 @@
   ]
   let isTyping = false
   let conversationId = null;
+  let botName = "Chatbot"; // Default name
+
+  // Fetch bot info from backend
+  function fetchBotInfo() {
+    fetch(`http://127.0.0.1:8000/api/user/bot/${encodeURIComponent(embedCode)}/info/`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.chatbot_name) botName = data.chatbot_name;
+        render();
+      })
+      .catch(() => {
+        botName = "Chatbot";
+        render();
+      });
+  }
 
   // Bot responses
   const botResponses = [
@@ -265,7 +303,7 @@
           </svg>
         </div>
         <div>
-          <div class="syncchat-header-title">SyncChat AI</div>
+          <div class="syncchat-header-title">${botName}</div>
           <div class="syncchat-header-status">Online</div>
         </div>
       </div>
@@ -471,20 +509,13 @@
       const msgArea = container.querySelector(".syncchat-messages");
       if (msgArea && prevScroll) msgArea.scrollTop = prevScroll;
       // Only focus input if not preserving (i.e., just opened)
-      if (!preserveInput) input.focus();
+      if (!preserveInput) {
+        const input = container.querySelector(".syncchat-input");
+        if (input) input.focus();
+      }
     }, 0)
   }
 
-  // Get embed code from script tag
-  const script = document.currentScript;
-  const embedCode = script ? script.getAttribute("data-embed-code") : null;
-
-  if (!embedCode) {
-    console.error("SyncChat: data-embed-code attribute missing on script tag.");
-    return;
-  }
-
-  // Use embedCode in API URL
   const API_URL = `http://127.0.0.1:8000/api/user/bot/${encodeURIComponent(embedCode)}/chat/`;
 
   // Send message
@@ -522,20 +553,17 @@
       .then(data => {
         logDebug("API response parsed");
         const botText = data.bot_reply || "Sorry, no response.";
-        // Use the real message id from backend for the bot message
         messages.push({
-          id: data.bot_message_id, // <-- Use backend-provided message id
+          id: data.bot_message_id,
           text: botText,
           isBot: true,
           satisfaction: null
         });
         isTyping = false;
-        // Store conversationId from backend if not already set
         if (data.conversation_id) {
           conversationId = data.conversation_id;
         }
         render();
-        // Scroll to bottom
         const msgArea = container.querySelector(".syncchat-messages");
         if (msgArea) msgArea.scrollTop = msgArea.scrollHeight;
       })
@@ -547,6 +575,7 @@
       })
   }
 
-  // Initial render
-  render()
+  // Initial fetch and render
+  fetchBotInfo();
+  render();
 })()
