@@ -5,7 +5,7 @@ from collections import deque
 import csv
 import time
 import logging
-from tokenizer import tokenizer  # Centralized tokenizer from embeddings.py
+from embeddings import tokenizer  # Centralized tokenizer from embeddings.py
 from functools import lru_cache
 import nltk
 from nltk.tokenize import sent_tokenize
