@@ -1,36 +1,18 @@
 import pytest
-from datetime import date
-from user.models import CustomUser, Bot, Conversation, Message
-@pytest.fixture
-def user() -> CustomUser:
-    return CustomUser.objects.create_user(
-        username="testuser123@gmail.com",
-        email="testuser123@gmail.com",
-        first_name="test",
-        last_name="user",
-        password="testpassword123"
-    )
+from user.factories import UserFactory, BotFactory, ConversationFactory, MessageFactory
 
 @pytest.fixture
-def bot(user) -> Bot:
-    return Bot.objects.create(
-        user=user,
-        website_url="https://example.com",
-        business_name="Test Business",
-        chatbot_name="TestBot",
-        collection_name="unique_collection"
-    )
+def user():
+    return UserFactory()
 
 @pytest.fixture
-def conversation(bot):
-    return Conversation.objects.create(
-        bot = bot
-    )
+def bot():
+    return BotFactory()
 
 @pytest.fixture
-def message(conversation):
-    return Message.objects.create(
-        conversation=conversation,
-        text= "test message",
-        sender = "bot",
-    )
+def conversation():
+    return ConversationFactory()
+
+@pytest.fixture
+def message():
+    return MessageFactory()
