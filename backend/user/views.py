@@ -555,3 +555,34 @@ def bot_info(request, embed_code):
         "theme_color": getattr(bot, "theme_color", None),
         "status": bot.status,
     })
+
+@api_view(["POST"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def edit_bot(request, bot_id):
+    """
+    Edit an existing bot's info. Only the owner can edit.
+    """
+    try:
+        user = request.user
+        data = request.data
+        bot = Bot.objects.get(id=bot_id, user=user)  # Ensure ownership
+
+        # Update fields if provided
+        bot.website_url = data.get("websiteUrl", bot.website_url)
+        bot.business_name = data.get("businessName", bot.business_name)
+        bot.business_type = data.get("businessType", bot.business_type)
+        bot.chatbot_name = data.get("chatbotName", bot.chatbot_name)
+        bot.tone = data.get("tone", bot.tone)
+        bot.support_goals = data.get("supportGoals", bot.support_goals)
+        bot.languages = data.get("languages", bot.languages)
+        bot.allowed_domains = data.get("allowedDomains", bot.allowed_domains)
+        bot.status = data.get("status", bot.status)
+        # Add more fields as needed
+
+        bot.save()
+        return JsonResponse({"success": True, "bot_id": bot.id})
+    except Bot.DoesNotExist:
+        return JsonResponse({"error": "Bot not found or not owned by user"}, status=404)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
